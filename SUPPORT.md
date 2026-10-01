@@ -6,8 +6,11 @@
 
 ### Requirements
 
-iPhone 17 Pro, iPhone 17 Pro Max, iPhone 18 Pro or iPhone 18 Pro Max with iOS 27, and about 12 GB of free storage
-for the model. On other iPhones you can view and manage synced chats, but the model does not run.
+An iPhone with an A19 Pro chip or later and 12 GB of memory, with iOS 27, and about 12 GB of free storage for the
+model. On other iPhones you can view and manage synced chats, but the model does not run.
+
+Long replies make the iPhone warm. Thinner models warm up sooner, and within then writes more slowly to keep the
+iPhone comfortable.
 
 ### Downloading the model
 
@@ -56,8 +59,10 @@ Email within@royomni.com. Please include your iPhone model and iOS version.
 
 ### 设备要求
 
-iPhone 17 Pro、iPhone 17 Pro Max、iPhone 18 Pro 或 iPhone 18 Pro Max，系统为 iOS 27，并为模型预留约 12 GB 可用空间。
+搭载 A19 Pro 或更新芯片、12 GB 内存的 iPhone，系统为 iOS 27，并为模型预留约 12 GB 可用空间。
 在其他 iPhone 上可以查看和管理已同步的聊天，但无法运行模型。
+
+较长的回复会让 iPhone 发热。机身较薄的机型升温更快，这时 within 会放慢生成速度，让 iPhone 保持舒适的温度。
 
 ### 下载模型
 
