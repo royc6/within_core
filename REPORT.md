@@ -52,7 +52,7 @@ We also report the approaches that failed and what each failure rules out.
 | Is each call's arithmetic right? | 71/71 outputs pass; worst PSNR 45.6 dB, worst cosine 0.99906; head keeps the top-1 token, KL 8.5 × 10⁻⁵ nats | against an FP32 recomputation of the same quantized graph on the same input bytes | `numerics.json` |
 | Is the whole chain right? | Largest per-item NLL difference 0.0047 nats/token over 28 items (tolerance 0.005) | phone engine against an independent full-sequence recomputation | `numerics.json` |
 | How much quality is lost? | +0.0213 nats/token (limit 0.05); worst subset 0.029, worst item 0.102; greedy agreement 95.1% | 200 frozen prompts, 25,040 reference tokens | `quality.json` |
-| How fast? | 16.4 tokens/s decode; first token 0.62–0.64 s | 32-token prompt, 5 × 512 tokens, nominal thermal state at start | `performance.json` |
+| How fast? | 16.4 tokens/s decode; first token 0.62–0.64 s | KV capacity 16,384; 32-token prompt, 5 × 512 tokens, nominal thermal state at start | `performance.json` |
 | How much memory? | Peak 5.73 GB, at least 0.71 GB always available, of a 6.44 GB limit | 11-minute, 20-turn conversation on battery | `sustained.json`, `memory.json` |
 | Does it hold up thermally? | Fair after 62 s, never serious; paced to about 9 tokens/s | same run | `sustained.json` |
 

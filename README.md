@@ -8,8 +8,9 @@ it is published here with the conversion pipeline, the verification tools, a dem
   42 decoder layers, converted into eight Core AI assets.
 - **Device:** an iPhone with an A19 Pro chip or later and 12 GB of memory, iOS 27. All measurements below come
   from an iPhone 18 Pro with iOS 27.2.
-- **Result:** 16.4 tokens/s decode with a 16,384-token context, with every decoder chunk running on the Neural Engine
-  and a peak memory footprint of 5.73 GB against the 6.44 GB per-app limit.
+- **Result:** every decoder chunk runs on the Neural Engine. Decode runs at 16.4 tokens/s with the KV cache compiled
+  for 16,384 tokens (32-token prompt, 512 generated tokens; conditions under [Results](#results)), and the peak memory
+  footprint is 5.73 GB against the 6.44 GB per-app limit.
 - **Code:** a Swift package (the engine), Python (conversion and verification), and a SwiftUI demo app.
 - **License:** Apache License 2.0 for this repository's code and documentation; the model itself is subject to the
   Gemma 4 terms (see [Others](#others)).
@@ -26,9 +27,39 @@ file in [`results/`](results/); conditions and methods are in the [technical rep
 | Does it run on the Neural Engine? | Yes. In a trace of all processes, 96 of 96 Neural Engine calls coincide with a Neural Engine prediction and 0 of 96 overlap the process's GPU work; the GPU and CPU control arms and two idle recordings behave as expected. |
 | Are the Neural Engine's outputs numerically right? | 71 of 71 chunk outputs are within PSNR 35 dB and cosine 0.999 of an FP32 recomputation of the same quantized graph (worst 45.6 dB). |
 | How much quality does quantization cost? | +0.0213 nats/token of negative log-likelihood over the FP32 original on a frozen set of 200 prompts (limit 0.05). |
-| How fast is it? | 16.4 tokens/s decode with a 16,384-token KV capacity; 0.62–0.64 s to the first token of a 32-token prompt. |
-| How fast once the phone is warm? | About 9 tokens/s once the device warms and the engine paces itself (11-minute sustained run). |
-| How much memory does it use? | A peak footprint of 5.73 GB of the 6.44 GB per-process limit over an 11-minute conversation. |
+| How fast is it? | 16.4 tokens/s decode with the KV cache compiled for 16,384 tokens<sup>1</sup>; 0.62–0.64 s to the first token of a 32-token prompt<sup>2</sup>. |
+| How fast once the phone is warm? | About 9 tokens/s once the device warms and the engine paces itself (11-minute sustained run)<sup>3</sup>. |
+| How much memory does it use? | A peak footprint of 5.73 GB of the 6.44 GB per-process limit over an 11-minute conversation<sup>4</sup>. |
+
+1. Decode speed: a fixed 32-token prompt, no system prompt, thinking off; temperature 0.7, top-K 64, top-P 0.95;
+   three warm-up generations of 64 tokens, then five runs of exactly 512 generated tokens (stop tokens suppressed),
+   each started in the nominal thermal state; the median of the five runs. The capacity (16,384) is the number of
+   tokens the KV cache is compiled for, not the length of the measured conversations, which reach 544 tokens. Every
+   step binds the full cache, so speed depends on the capacity, not on the position: the same engine compiled for
+   4,096 tokens decodes at 21.6 tokens/s (Debug build, plugged in). A speed means little without its capacity,
+   prompt length and output length.
+2. First token: from the request to the first sampled token, after warm-up; the medians for two exports of the same
+   package. The first generation after loading the model takes 2.30–2.99 s.
+3. Sustained run: one conversation of 20 turns of exactly 256 tokens, 5 s apart, 660 s in all, with the same
+   sampling and the same 16,384-token capacity; airplane mode, screen at 50% brightness, unplugged. Once the phone
+   leaves the nominal thermal state, the engine takes at least 110 ms per token.
+4. Memory: `phys_footprint` sampled once a second. The limit is the one that applies with the increased memory limit
+   entitlement.
+
+All results: iPhone 18 Pro (iPhone19,2), iOS 27.2, Release build, all eight chunks on the Neural Engine. Google
+publishes figures for Gemma 4 E4B on LiteRT-LM, the runtime of the Google AI Edge Gallery app, under different
+conditions:
+
+| Condition | This repository | Google's LiteRT-LM figures |
+| --- | --- | --- |
+| Device and compute unit | iPhone 18 Pro, Neural Engine | iPhone 17 Pro, GPU or CPU |
+| KV capacity (context length) | 16,384 tokens | 2,048 tokens |
+| Prompt and generated tokens | 32 and 512 | 1,024 and 256 |
+| Weight precision | MLP 6-bit palettes, attention INT8, head INT4; embedding tables FP16 | not stated for E4B (2.24 GB of decoder weights, 0.67 GB of embedding parameters); Google's E2B card describes a mix of 2-, 4- and 8-bit weights |
+| Model file | 10.5 GB | 3.66 GB |
+
+Speed, time to first token and memory all depend on these conditions, so the two sets of figures cannot be compared
+directly. Section 3.5 of the [technical report](REPORT.md) lists both with these caveats.
 
 ## How it works
 
