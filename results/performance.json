@@ -1,0 +1,242 @@
+{
+ "claims": [
+  "Decode runs at a median of 16.4 tokens/s with a 16,384-token KV capacity; the first token of a 32-token prompt arrives after a median of 0.62-0.64 s once the model is loaded.",
+  "Decode speed depends on the KV capacity compiled into the package, not on the position: every step binds the full caches.",
+  "After the device reaches the fair thermal state the engine paces decode to 110 ms per token (about 9 tokens/s)."
+ ],
+ "procedure": {
+  "prompt": "32 tokens, fixed text, no system prompt",
+  "thinking": false,
+  "sampling": {
+   "temperature": 0.7,
+   "topK": 64,
+   "topP": 0.95
+  },
+  "warmups": {
+   "count": 3,
+   "tokens": 64
+  },
+  "runs": {
+   "count": 5,
+   "tokens": 512
+  },
+  "measuredTokens": [
+   33,
+   512
+  ],
+  "speed": "per run, 1000 / median inter-token interval over tokens 33..512; reported value = median of the 5 runs",
+  "firstToken": "request start to the first sampled token, after warmup (model loaded)",
+  "thermal": "each run starts in the nominal state, confirmed within 10 s",
+  "exactTokens": "stop tokens suppressed so that every run generates exactly 512 tokens",
+  "samplerSeed": "not fixed (system random generator); the speed measurement does not depend on the sampled text",
+  "passRule": {
+   "firstTokenSeconds": 5.0,
+   "tokensPerSecond": 10.0
+  }
+ },
+ "conditions": {
+  "device": {
+   "model": "iPhone 18 Pro",
+   "identifier": "iPhone19,2",
+   "os": "iOS 27.2 (24B5089g)"
+  },
+  "power": "not recorded for these runs"
+ },
+ "results": [
+  {
+   "package": "lut6-c16384-20260930-01",
+   "appBuild": "Release",
+   "contextLimit": 16384,
+   "medianTokensPerSecond": 16.43,
+   "medianFirstTokenMs": 640,
+   "maximumFirstTokenMs": 886,
+   "runs": [
+    {
+     "tokensPerSecond": 16.44,
+     "medianIntervalMs": 60.8,
+     "firstTokenMs": 640,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal",
+     "waitedForNominalSeconds": 0
+    },
+    {
+     "tokensPerSecond": 16.43,
+     "medianIntervalMs": 60.9,
+     "firstTokenMs": 643,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal",
+     "waitedForNominalSeconds": 0
+    },
+    {
+     "tokensPerSecond": 16.38,
+     "medianIntervalMs": 61.0,
+     "firstTokenMs": 617,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "fair",
+     "waitedForNominalSeconds": 0
+    },
+    {
+     "tokensPerSecond": 16.46,
+     "medianIntervalMs": 60.8,
+     "firstTokenMs": 886,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal",
+     "waitedForNominalSeconds": 28
+    },
+    {
+     "tokensPerSecond": 9.04,
+     "medianIntervalMs": 110.6,
+     "firstTokenMs": 617,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "fair",
+     "waitedForNominalSeconds": 0
+    }
+   ],
+   "warmupFirstTokenMs": [
+    2989,
+    615,
+    615
+   ],
+   "passed": true
+  },
+  {
+   "package": "lut6-c16384-20261001-01",
+   "appBuild": "Release",
+   "contextLimit": 16384,
+   "medianTokensPerSecond": 16.41,
+   "medianFirstTokenMs": 615,
+   "maximumFirstTokenMs": 1553,
+   "runs": [
+    {
+     "tokensPerSecond": 9.06,
+     "medianIntervalMs": 110.4,
+     "firstTokenMs": 613,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "fair",
+     "waitedForNominalSeconds": 0
+    },
+    {
+     "tokensPerSecond": 16.43,
+     "medianIntervalMs": 60.9,
+     "firstTokenMs": 1553,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal",
+     "waitedForNominalSeconds": 235
+    },
+    {
+     "tokensPerSecond": 16.37,
+     "medianIntervalMs": 61.1,
+     "firstTokenMs": 615,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "fair",
+     "waitedForNominalSeconds": 0
+    },
+    {
+     "tokensPerSecond": 16.47,
+     "medianIntervalMs": 60.7,
+     "firstTokenMs": 971,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal",
+     "waitedForNominalSeconds": 218
+    },
+    {
+     "tokensPerSecond": 16.41,
+     "medianIntervalMs": 60.9,
+     "firstTokenMs": 611,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "fair",
+     "waitedForNominalSeconds": 0
+    }
+   ],
+   "warmupFirstTokenMs": [
+    2299,
+    636,
+    614
+   ],
+   "passed": true
+  }
+ ],
+ "pacedRunNote": "in each set of five runs one run entered the fair state during generation and was paced (median interval about 110 ms, 9.0 tokens/s); the median of five is unaffected",
+ "capacity": {
+  "note": "same code, Debug build, plugged in, cold start, 512 generated tokens; source is a development note, not a recorded verdict",
+  "rows": [
+   {
+    "package": "single capacity 16384",
+    "tokensPerSecond": 16.4,
+    "peakFootprintGB": 5.692,
+    "minimumAvailableGB": 0.75
+   },
+   {
+    "package": "single capacity 4096",
+    "tokensPerSecond": 21.6,
+    "peakFootprintGB": 5.027,
+    "minimumAvailableGB": 1.415
+   }
+  ]
+ },
+ "prefill": {
+  "note": "continuation turns of the sustained run (sustained.json) whose KV could not be reused re-prefilled the whole conversation",
+  "rows": [
+   {
+    "promptTokens": 1419,
+    "firstTokenMs": 5243
+   },
+   {
+    "promptTokens": 2544,
+    "firstTokenMs": 9317
+   }
+  ],
+  "derivedTokensPerSecond": {
+   "value": [
+    271,
+    273
+   ],
+   "formula": "promptTokens / first-token seconds (includes the final full step and sampling)"
+  },
+  "plan": "prompt tokens except the last run through chunks 0-3 only, 16 per call (prefill_16), remainder one per call; the last token runs step_1 through all 8 chunks"
+ },
+ "kvRestore": {
+  "note": "Debug build, capacity 16384, outputs preallocated: a 13.7K-token conversation released, the engine reloaded in the same process and the host KV read back from disk",
+  "firstTokenSecondsAfterRestore": 1.27,
+  "firstTokenSecondsWithFullPrefill": 54,
+  "peakFootprintGB": 5.669,
+  "minimumAvailableGB": 0.774
+ },
+ "load": {
+  "note": "Debug build, single-capacity 16384 package, first launch compiles all 8 chunks for the Neural Engine; later launches load from the compile cache",
+  "coldCompileSeconds": 138,
+  "warmLoadSeconds": 6
+ },
+ "published": {
+  "note": "external figures for comparison; different device generation, runtime, compute unit, quantization and context capacity; not a like-for-like comparison and not reproduced here",
+  "rows": [
+   {
+    "url": "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm",
+    "alsoAt": "https://developers.google.com/edge/litert-lm/models/gemma-4",
+    "device": "iPhone 17 Pro",
+    "conditions": "1024 prefill tokens, 256 decode tokens, context 2048; time to first token excludes load; caches enabled and initialized",
+    "memoryMetric": "peak CPU memory; phys_footprint on iOS",
+    "modelFile": "3.66 GB (2.24 GB decoder weights, 0.67 GB embedding parameters, memory-mapped)",
+    "gpu": {
+     "prefillTokensPerSecond": 1189,
+     "decodeTokensPerSecond": 25.1,
+     "timeToFirstTokenSeconds": 0.9,
+     "peakMemoryMB": 3380
+    },
+    "cpu": {
+     "prefillTokensPerSecond": 159,
+     "decodeTokensPerSecond": 9.7,
+     "timeToFirstTokenSeconds": 6.5,
+     "peakMemoryMB": 961
+    }
+   },
+   {
+    "url": "https://github.com/john-rocky/CoreML-LLM",
+    "device": "iPhone 17 Pro",
+    "decodeTokensPerSecond": 15.7,
+    "notes": "multimodal Gemma 4 E4B build: 5 INT8 chunks of 8 layers, FP16 head, memory-mapped embeddings, context 2048, as stated by the project"
+   }
+  ],
+  "retrieved": "2026-10"
+ }
+}

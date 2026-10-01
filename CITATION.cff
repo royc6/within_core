@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "within_core: Running Gemma 4 E4B on the Apple Neural Engine"
+abstract: >-
+  Partitioning, placement, quantization and verification of the Gemma 4 E4B decoder for the Apple Neural
+  Engine on an iPhone, inside the memory limit of one app process.
+authors:
+  - family-names: Cheng
+    given-names: Roy
+type: software
+license: Apache-2.0
+repository-code: "https://github.com/royc6/within_core"
+keywords:
+  - on-device inference
+  - Neural Engine
+  - heterogeneous computing
+  - quantization
+  - large language models

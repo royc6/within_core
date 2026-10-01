@@ -1,0 +1,15 @@
+This model package contains a modified version of Gemma 4 E4B-it
+(google/gemma-4-E4B-it) by Google DeepMind, licensed under the Apache License,
+Version 2.0: see LICENSE in this package and
+https://ai.google.dev/gemma/docs/gemma_4_license
+
+Modified by the within project: the model is converted to Core AI graphs for
+the Apple Neural Engine (chunk-*.aimodel), its weights are quantized (this
+package's format is the weightFormat field of chunk-contract.json), and its
+embedding tables are stored as raw FP16 files. The tokenizer, chat template and
+generation configuration are Google's, unchanged.
+
+Google also publishes a Gemma Prohibited Use Policy and an intended use
+statement for Gemma models:
+https://ai.google.dev/gemma/prohibited_use_policy
+https://ai.google.dev/gemma/intended_use_statement

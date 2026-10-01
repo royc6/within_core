@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  python:
+    name: Python (ruff, pytest)
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: ruff format --check .
+      - run: ruff check .
+      - run: pytest -q
+
+  swift:
+    name: Swift (build for iOS, test WithinCoreBase)
+    # Manual only until GitHub's runners have Xcode 27 (iOS/macOS 27 SDKs); the within app's Xcode Cloud workflow builds the engine.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Build the engine for iOS
+        run: xcodebuild -scheme WithinCore-Package -destination 'generic/platform=iOS' build
+      - name: Build the demo app for iOS
+        run: >-
+          xcodebuild -project examples/WithinDemo/WithinDemo.xcodeproj -scheme WithinDemo
+          -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
+      - name: Test the platform-independent parts
+        run: swift test --filter WithinCoreBaseTests

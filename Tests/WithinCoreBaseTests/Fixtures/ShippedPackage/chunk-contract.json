@@ -1,0 +1,1373 @@
+{
+  "contract": "gemma4-chunked-hostkv-v1",
+  "contextLimit": 16384,
+  "slidingCacheLength": 512,
+  "prefillLength": 16,
+  "firstSharedLayer": 24,
+  "weightFormat": "int8-per-channel-symmetric-weight-only; feedforward lut6; head w4",
+  "chunks": [
+    {
+      "file": "chunk-00.aimodel",
+      "start": 0,
+      "end": 6,
+      "functions": {
+        "step_1": {
+          "length": 1,
+          "inputs": [
+            "embedded",
+            "token_identity",
+            "local_cos",
+            "local_sin",
+            "global_cos",
+            "global_sin",
+            "local_mask",
+            "global_mask",
+            "key_0",
+            "value_0",
+            "key_1",
+            "value_1",
+            "key_2",
+            "value_2",
+            "key_3",
+            "value_3",
+            "key_4",
+            "value_4",
+            "key_5",
+            "value_5"
+          ],
+          "outputs": [
+            "hidden",
+            "fresh_key_0",
+            "fresh_value_0",
+            "fresh_key_1",
+            "fresh_value_1",
+            "fresh_key_2",
+            "fresh_value_2",
+            "fresh_key_3",
+            "fresh_value_3",
+            "fresh_key_4",
+            "fresh_value_4",
+            "fresh_key_5",
+            "fresh_value_5"
+          ]
+        },
+        "prefill_16": {
+          "length": 16,
+          "inputs": [
+            "embedded",
+            "token_identity",
+            "local_cos",
+            "local_sin",
+            "global_cos",
+            "global_sin",
+            "local_mask",
+            "global_mask",
+            "key_0",
+            "value_0",
+            "key_1",
+            "value_1",
+            "key_2",
+            "value_2",
+            "key_3",
+            "value_3",
+            "key_4",
+            "value_4",
+            "key_5",
+            "value_5"
+          ],
+          "outputs": [
+            "hidden",
+            "fresh_key_0",
+            "fresh_value_0",
+            "fresh_key_1",
+            "fresh_value_1",
+            "fresh_key_2",
+            "fresh_value_2",
+            "fresh_key_3",
+            "fresh_value_3",
+            "fresh_key_4",
+            "fresh_value_4",
+            "fresh_key_5",
+            "fresh_value_5"
+          ]
+        }
+      },
+      "owned": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "externalDonors": [],
+      "inputShapes": {
+        "embedded": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "token_identity": [
+          1,
+          256,
+          6,
+          1
+        ],
+        "local_cos": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "local_sin": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "global_cos": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "global_sin": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "local_mask": [
+          1,
+          1,
+          1,
+          513
+        ],
+        "global_mask": [
+          1,
+          1,
+          1,
+          16385
+        ],
+        "key_0": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_0": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_1": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_1": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_2": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_2": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_3": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_3": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_4": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_4": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_5": [
+          1,
+          2,
+          512,
+          16384
+        ],
+        "value_5": [
+          1,
+          2,
+          512,
+          16384
+        ]
+      }
+    },
+    {
+      "file": "chunk-01.aimodel",
+      "start": 6,
+      "end": 12,
+      "functions": {
+        "step_1": {
+          "length": 1,
+          "inputs": [
+            "hidden",
+            "embedded",
+            "token_identity",
+            "local_cos",
+            "local_sin",
+            "global_cos",
+            "global_sin",
+            "local_mask",
+            "global_mask",
+            "key_6",
+            "value_6",
+            "key_7",
+            "value_7",
+            "key_8",
+            "value_8",
+            "key_9",
+            "value_9",
+            "key_10",
+            "value_10",
+            "key_11",
+            "value_11"
+          ],
+          "outputs": [
+            "hidden",
+            "fresh_key_6",
+            "fresh_value_6",
+            "fresh_key_7",
+            "fresh_value_7",
+            "fresh_key_8",
+            "fresh_value_8",
+            "fresh_key_9",
+            "fresh_value_9",
+            "fresh_key_10",
+            "fresh_value_10",
+            "fresh_key_11",
+            "fresh_value_11"
+          ]
+        },
+        "prefill_16": {
+          "length": 16,
+          "inputs": [
+            "hidden",
+            "embedded",
+            "token_identity",
+            "local_cos",
+            "local_sin",
+            "global_cos",
+            "global_sin",
+            "local_mask",
+            "global_mask",
+            "key_6",
+            "value_6",
+            "key_7",
+            "value_7",
+            "key_8",
+            "value_8",
+            "key_9",
+            "value_9",
+            "key_10",
+            "value_10",
+            "key_11",
+            "value_11"
+          ],
+          "outputs": [
+            "hidden",
+            "fresh_key_6",
+            "fresh_value_6",
+            "fresh_key_7",
+            "fresh_value_7",
+            "fresh_key_8",
+            "fresh_value_8",
+            "fresh_key_9",
+            "fresh_value_9",
+            "fresh_key_10",
+            "fresh_value_10",
+            "fresh_key_11",
+            "fresh_value_11"
+          ]
+        }
+      },
+      "owned": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "externalDonors": [],
+      "inputShapes": {
+        "hidden": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "embedded": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "token_identity": [
+          1,
+          256,
+          6,
+          1
+        ],
+        "local_cos": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "local_sin": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "global_cos": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "global_sin": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "local_mask": [
+          1,
+          1,
+          1,
+          513
+        ],
+        "global_mask": [
+          1,
+          1,
+          1,
+          16385
+        ],
+        "key_6": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_6": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_7": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_7": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_8": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_8": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_9": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_9": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_10": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_10": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_11": [
+          1,
+          2,
+          512,
+          16384
+        ],
+        "value_11": [
+          1,
+          2,
+          512,
+          16384
+        ]
+      }
+    },
+    {
+      "file": "chunk-02.aimodel",
+      "start": 12,
+      "end": 18,
+      "functions": {
+        "step_1": {
+          "length": 1,
+          "inputs": [
+            "hidden",
+            "embedded",
+            "token_identity",
+            "local_cos",
+            "local_sin",
+            "global_cos",
+            "global_sin",
+            "local_mask",
+            "global_mask",
+            "key_12",
+            "value_12",
+            "key_13",
+            "value_13",
+            "key_14",
+            "value_14",
+            "key_15",
+            "value_15",
+            "key_16",
+            "value_16",
+            "key_17",
+            "value_17"
+          ],
+          "outputs": [
+            "hidden",
+            "fresh_key_12",
+            "fresh_value_12",
+            "fresh_key_13",
+            "fresh_value_13",
+            "fresh_key_14",
+            "fresh_value_14",
+            "fresh_key_15",
+            "fresh_value_15",
+            "fresh_key_16",
+            "fresh_value_16",
+            "fresh_key_17",
+            "fresh_value_17"
+          ]
+        },
+        "prefill_16": {
+          "length": 16,
+          "inputs": [
+            "hidden",
+            "embedded",
+            "token_identity",
+            "local_cos",
+            "local_sin",
+            "global_cos",
+            "global_sin",
+            "local_mask",
+            "global_mask",
+            "key_12",
+            "value_12",
+            "key_13",
+            "value_13",
+            "key_14",
+            "value_14",
+            "key_15",
+            "value_15",
+            "key_16",
+            "value_16",
+            "key_17",
+            "value_17"
+          ],
+          "outputs": [
+            "hidden",
+            "fresh_key_12",
+            "fresh_value_12",
+            "fresh_key_13",
+            "fresh_value_13",
+            "fresh_key_14",
+            "fresh_value_14",
+            "fresh_key_15",
+            "fresh_value_15",
+            "fresh_key_16",
+            "fresh_value_16",
+            "fresh_key_17",
+            "fresh_value_17"
+          ]
+        }
+      },
+      "owned": [
+        12,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "externalDonors": [],
+      "inputShapes": {
+        "hidden": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "embedded": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "token_identity": [
+          1,
+          256,
+          6,
+          1
+        ],
+        "local_cos": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "local_sin": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "global_cos": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "global_sin": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "local_mask": [
+          1,
+          1,
+          1,
+          513
+        ],
+        "global_mask": [
+          1,
+          1,
+          1,
+          16385
+        ],
+        "key_12": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_12": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_13": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_13": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_14": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_14": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_15": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_15": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_16": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_16": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_17": [
+          1,
+          2,
+          512,
+          16384
+        ],
+        "value_17": [
+          1,
+          2,
+          512,
+          16384
+        ]
+      }
+    },
+    {
+      "file": "chunk-03.aimodel",
+      "start": 18,
+      "end": 24,
+      "functions": {
+        "step_1": {
+          "length": 1,
+          "inputs": [
+            "hidden",
+            "embedded",
+            "token_identity",
+            "local_cos",
+            "local_sin",
+            "global_cos",
+            "global_sin",
+            "local_mask",
+            "global_mask",
+            "key_18",
+            "value_18",
+            "key_19",
+            "value_19",
+            "key_20",
+            "value_20",
+            "key_21",
+            "value_21",
+            "key_22",
+            "value_22",
+            "key_23",
+            "value_23"
+          ],
+          "outputs": [
+            "hidden",
+            "fresh_key_18",
+            "fresh_value_18",
+            "fresh_key_19",
+            "fresh_value_19",
+            "fresh_key_20",
+            "fresh_value_20",
+            "fresh_key_21",
+            "fresh_value_21",
+            "fresh_key_22",
+            "fresh_value_22",
+            "fresh_key_23",
+            "fresh_value_23"
+          ]
+        },
+        "prefill_16": {
+          "length": 16,
+          "inputs": [
+            "hidden",
+            "embedded",
+            "token_identity",
+            "local_cos",
+            "local_sin",
+            "global_cos",
+            "global_sin",
+            "local_mask",
+            "global_mask",
+            "key_18",
+            "value_18",
+            "key_19",
+            "value_19",
+            "key_20",
+            "value_20",
+            "key_21",
+            "value_21",
+            "key_22",
+            "value_22",
+            "key_23",
+            "value_23"
+          ],
+          "outputs": [
+            "fresh_key_18",
+            "fresh_value_18",
+            "fresh_key_19",
+            "fresh_value_19",
+            "fresh_key_20",
+            "fresh_value_20",
+            "fresh_key_21",
+            "fresh_value_21",
+            "fresh_key_22",
+            "fresh_value_22",
+            "fresh_key_23",
+            "fresh_value_23"
+          ]
+        }
+      },
+      "owned": [
+        18,
+        19,
+        20,
+        21,
+        22,
+        23
+      ],
+      "externalDonors": [],
+      "inputShapes": {
+        "hidden": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "embedded": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "token_identity": [
+          1,
+          256,
+          6,
+          1
+        ],
+        "local_cos": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "local_sin": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "global_cos": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "global_sin": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "local_mask": [
+          1,
+          1,
+          1,
+          513
+        ],
+        "global_mask": [
+          1,
+          1,
+          1,
+          16385
+        ],
+        "key_18": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_18": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_19": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_19": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_20": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_20": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_21": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_21": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_22": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_22": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "key_23": [
+          1,
+          2,
+          512,
+          16384
+        ],
+        "value_23": [
+          1,
+          2,
+          512,
+          16384
+        ]
+      }
+    },
+    {
+      "file": "chunk-04.aimodel",
+      "start": 24,
+      "end": 30,
+      "functions": {
+        "step_1": {
+          "length": 1,
+          "inputs": [
+            "hidden",
+            "embedded",
+            "token_identity",
+            "local_cos",
+            "local_sin",
+            "global_cos",
+            "global_sin",
+            "local_mask",
+            "global_mask",
+            "key_22",
+            "value_22",
+            "fresh_key_22",
+            "fresh_value_22",
+            "key_23",
+            "value_23",
+            "fresh_key_23",
+            "fresh_value_23"
+          ],
+          "outputs": [
+            "hidden"
+          ]
+        }
+      },
+      "owned": [],
+      "externalDonors": [
+        22,
+        23
+      ],
+      "inputShapes": {
+        "hidden": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "embedded": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "token_identity": [
+          1,
+          256,
+          6,
+          1
+        ],
+        "local_cos": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "local_sin": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "global_cos": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "global_sin": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "local_mask": [
+          1,
+          1,
+          1,
+          513
+        ],
+        "global_mask": [
+          1,
+          1,
+          1,
+          16385
+        ],
+        "key_22": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_22": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "fresh_key_22": [
+          1,
+          2,
+          256,
+          1
+        ],
+        "fresh_value_22": [
+          1,
+          2,
+          256,
+          1
+        ],
+        "key_23": [
+          1,
+          2,
+          512,
+          16384
+        ],
+        "value_23": [
+          1,
+          2,
+          512,
+          16384
+        ],
+        "fresh_key_23": [
+          1,
+          2,
+          512,
+          1
+        ],
+        "fresh_value_23": [
+          1,
+          2,
+          512,
+          1
+        ]
+      }
+    },
+    {
+      "file": "chunk-05.aimodel",
+      "start": 30,
+      "end": 36,
+      "functions": {
+        "step_1": {
+          "length": 1,
+          "inputs": [
+            "hidden",
+            "embedded",
+            "token_identity",
+            "local_cos",
+            "local_sin",
+            "global_cos",
+            "global_sin",
+            "local_mask",
+            "global_mask",
+            "key_22",
+            "value_22",
+            "fresh_key_22",
+            "fresh_value_22",
+            "key_23",
+            "value_23",
+            "fresh_key_23",
+            "fresh_value_23"
+          ],
+          "outputs": [
+            "hidden"
+          ]
+        }
+      },
+      "owned": [],
+      "externalDonors": [
+        22,
+        23
+      ],
+      "inputShapes": {
+        "hidden": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "embedded": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "token_identity": [
+          1,
+          256,
+          6,
+          1
+        ],
+        "local_cos": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "local_sin": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "global_cos": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "global_sin": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "local_mask": [
+          1,
+          1,
+          1,
+          513
+        ],
+        "global_mask": [
+          1,
+          1,
+          1,
+          16385
+        ],
+        "key_22": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_22": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "fresh_key_22": [
+          1,
+          2,
+          256,
+          1
+        ],
+        "fresh_value_22": [
+          1,
+          2,
+          256,
+          1
+        ],
+        "key_23": [
+          1,
+          2,
+          512,
+          16384
+        ],
+        "value_23": [
+          1,
+          2,
+          512,
+          16384
+        ],
+        "fresh_key_23": [
+          1,
+          2,
+          512,
+          1
+        ],
+        "fresh_value_23": [
+          1,
+          2,
+          512,
+          1
+        ]
+      }
+    },
+    {
+      "file": "chunk-06.aimodel",
+      "start": 36,
+      "end": 42,
+      "functions": {
+        "step_1": {
+          "length": 1,
+          "inputs": [
+            "hidden",
+            "embedded",
+            "token_identity",
+            "local_cos",
+            "local_sin",
+            "global_cos",
+            "global_sin",
+            "local_mask",
+            "global_mask",
+            "key_22",
+            "value_22",
+            "fresh_key_22",
+            "fresh_value_22",
+            "key_23",
+            "value_23",
+            "fresh_key_23",
+            "fresh_value_23"
+          ],
+          "outputs": [
+            "hidden"
+          ]
+        }
+      },
+      "owned": [],
+      "externalDonors": [
+        22,
+        23
+      ],
+      "inputShapes": {
+        "hidden": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "embedded": [
+          1,
+          2560,
+          1,
+          1
+        ],
+        "token_identity": [
+          1,
+          256,
+          6,
+          1
+        ],
+        "local_cos": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "local_sin": [
+          1,
+          256,
+          1,
+          1
+        ],
+        "global_cos": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "global_sin": [
+          1,
+          512,
+          1,
+          1
+        ],
+        "local_mask": [
+          1,
+          1,
+          1,
+          513
+        ],
+        "global_mask": [
+          1,
+          1,
+          1,
+          16385
+        ],
+        "key_22": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "value_22": [
+          1,
+          2,
+          256,
+          512
+        ],
+        "fresh_key_22": [
+          1,
+          2,
+          256,
+          1
+        ],
+        "fresh_value_22": [
+          1,
+          2,
+          256,
+          1
+        ],
+        "key_23": [
+          1,
+          2,
+          512,
+          16384
+        ],
+        "value_23": [
+          1,
+          2,
+          512,
+          16384
+        ],
+        "fresh_key_23": [
+          1,
+          2,
+          512,
+          1
+        ],
+        "fresh_value_23": [
+          1,
+          2,
+          512,
+          1
+        ]
+      }
+    },
+    {
+      "file": "chunk-07.aimodel",
+      "start": 42,
+      "end": 42,
+      "owned": [],
+      "externalDonors": [],
+      "head": {
+        "parts": 16,
+        "rows": 16384
+      },
+      "functions": {
+        "step_1": {
+          "length": 1,
+          "inputs": [
+            "hidden"
+          ],
+          "outputs": [
+            "logits_00",
+            "logits_01",
+            "logits_02",
+            "logits_03",
+            "logits_04",
+            "logits_05",
+            "logits_06",
+            "logits_07",
+            "logits_08",
+            "logits_09",
+            "logits_10",
+            "logits_11",
+            "logits_12",
+            "logits_13",
+            "logits_14",
+            "logits_15"
+          ]
+        }
+      },
+      "inputShapes": {
+        "hidden": [
+          1,
+          2560,
+          1,
+          1
+        ]
+      }
+    }
+  ]
+}

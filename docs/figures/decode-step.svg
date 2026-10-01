@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 431" width="980" height="431" role="img" aria-labelledby="title desc" font-family="Helvetica, Arial, sans-serif">
+<title id="title">Time of one decode step</title>
+<desc id="desc">Stacked bar of median Neural Engine busy time for chunks 0 to 6 (about 7 ms each) and the head (3.8 ms), 52.8 ms in total, against a measured median token interval of about 61 ms (16.4 tokens per second) and the 110 ms paced interval in the fair thermal state.</desc>
+<style>
+.bg{fill:#fcfcfb}
+.t1{fill:#0b0b0b;font-size:16px;font-weight:600}
+.t2{fill:#0b0b0b;font-size:13px}
+.t2b{fill:#0b0b0b;font-size:13px;font-weight:600}
+.t3{fill:#52514e;font-size:12px}
+.t4{fill:#898781;font-size:11px}
+.num{font-variant-numeric:tabular-nums}
+.grid{stroke:#e1e0d9;stroke-width:1}
+.axis{stroke:#c3c2b7;stroke-width:1}
+.line{stroke:#52514e;stroke-width:1.5;fill:none}
+.ane{fill:#2a78d6}.aneS{stroke:#2a78d6}.aneT{fill:#e6effa}
+.gpu{fill:#eb6834}.gpuS{stroke:#eb6834}.gpuT{fill:#fcece5}
+.cpu{fill:#1baf7a}.cpuS{stroke:#1baf7a}.cpuT{fill:#e3f4ed}
+.neutral{fill:#b9b8b2}.neutralS{stroke:#898781}
+.panel{fill:#f4f3ef}
+.surf{fill:#fcfcfb}
+.arrow{fill:#52514e}
+.hatch{stroke:#2a78d6;stroke-width:1.2}
+.bad{fill:#d03b3b}.badS{stroke:#d03b3b}
+.halo{paint-order:stroke;stroke:#fcfcfb;stroke-width:4px;stroke-linejoin:round}
+.haloT{paint-order:stroke;stroke:#e6effa;stroke-width:5px;stroke-linejoin:round}
+.haloA{paint-order:stroke;stroke:#2a78d6;stroke-width:5px;stroke-linejoin:round}
+@media (prefers-color-scheme: dark){
+.bg{fill:#1a1a19}
+.t1,.t2,.t2b{fill:#ffffff}
+.t3{fill:#c3c2b7}
+.grid{stroke:#2c2c2a}
+.axis{stroke:#383835}
+.line{stroke:#c3c2b7}
+.ane{fill:#3987e5}.aneS{stroke:#3987e5}.aneT{fill:#1c2a3d}
+.gpu{fill:#d95926}.gpuS{stroke:#d95926}.gpuT{fill:#3a2418}
+.cpu{fill:#199e70}.cpuS{stroke:#199e70}.cpuT{fill:#16302a}
+.neutral{fill:#5f5e5a}.neutralS{stroke:#898781}
+.panel{fill:#232322}
+.surf{fill:#1a1a19}
+.arrow{fill:#c3c2b7}
+.hatch{stroke:#3987e5}
+.halo{stroke:#1a1a19}.haloT{stroke:#1c2a3d}.haloA{stroke:#3987e5}
+}
+</style>
+<defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L8,4 L0,8 z"/></marker><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="hatch" x1="0" y1="0" x2="0" y2="6"/></pattern><pattern id="hatchW" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#ffffff" stroke-opacity="0.55" stroke-width="1.2"/></pattern></defs>
+<rect class="bg" x="0" y="0" width="980" height="431" rx="10"/>
+<text x="24" y="32" class="t1" text-anchor="start">Time of one decode step</text><text x="24" y="52" class="t3" text-anchor="start">iPhone 18 Pro, iOS 27.2: Neural Engine busy time of the eight chunk calls against the token interval</text><line x1="160.0" y1="76" x2="160.0" y2="270" class="grid"/><text x="160.0" y="288" class="t4 num" text-anchor="middle">0</text><line x1="226.0" y1="76" x2="226.0" y2="270" class="grid"/><text x="226.0" y="288" class="t4 num" text-anchor="middle">10</text><line x1="292.0" y1="76" x2="292.0" y2="270" class="grid"/><text x="292.0" y="288" class="t4 num" text-anchor="middle">20</text><line x1="358.0" y1="76" x2="358.0" y2="270" class="grid"/><text x="358.0" y="288" class="t4 num" text-anchor="middle">30</text><line x1="424.0" y1="76" x2="424.0" y2="270" class="grid"/><text x="424.0" y="288" class="t4 num" text-anchor="middle">40</text><line x1="490.0" y1="76" x2="490.0" y2="270" class="grid"/><text x="490.0" y="288" class="t4 num" text-anchor="middle">50</text><line x1="556.0" y1="76" x2="556.0" y2="270" class="grid"/><text x="556.0" y="288" class="t4 num" text-anchor="middle">60</text><line x1="622.0" y1="76" x2="622.0" y2="270" class="grid"/><text x="622.0" y="288" class="t4 num" text-anchor="middle">70</text><line x1="688.0" y1="76" x2="688.0" y2="270" class="grid"/><text x="688.0" y="288" class="t4 num" text-anchor="middle">80</text><line x1="754.0" y1="76" x2="754.0" y2="270" class="grid"/><text x="754.0" y="288" class="t4 num" text-anchor="middle">90</text><line x1="820.0" y1="76" x2="820.0" y2="270" class="grid"/><text x="820.0" y="288" class="t4 num" text-anchor="middle">100</text><line x1="886.0" y1="76" x2="886.0" y2="270" class="grid"/><text x="886.0" y="288" class="t4 num" text-anchor="middle">110</text><line x1="952.0" y1="76" x2="952.0" y2="270" class="grid"/><text x="952.0" y="288" class="t4 num" text-anchor="middle">120</text><text x="952.0" y="304" class="t4" text-anchor="end">ms</text><text x="24" y="110" class="t2" text-anchor="start">Neural Engine busy<tspan dy="-5" font-size="9px">1</tspan></text><rect x="160.0" y="90" width="45.2" height="30" rx="3" class="ane"><title>chunk 0: 7.15 ms</title></rect><text x="182.595" y="110" class="t4" text-anchor="middle" style="fill:#ffffff">0</text><rect x="207.2" y="90" width="45.3" height="30" rx="3" class="ane"><title>chunk 1: 7.17 ms</title></rect><text x="229.851" y="110" class="t4" text-anchor="middle" style="fill:#ffffff">1</text><rect x="254.5" y="90" width="44.9" height="30" rx="3" class="ane"><title>chunk 2: 7.11 ms</title></rect><text x="276.975" y="110" class="t4" text-anchor="middle" style="fill:#ffffff">2</text><rect x="301.4" y="90" width="44.1" height="30" rx="3" class="ane"><title>chunk 3: 6.99 ms</title></rect><text x="323.505" y="110" class="t4" text-anchor="middle" style="fill:#ffffff">3</text><rect x="347.6" y="90" width="41.9" height="30" rx="3" class="ane"><title>chunk 4: 6.65 ms</title></rect><text x="368.517" y="110" class="t4" text-anchor="middle" style="fill:#ffffff">4</text><rect x="391.5" y="90" width="44.4" height="30" rx="3" class="ane"><title>chunk 5: 7.03 ms</title></rect><text x="413.661" y="110" class="t4" text-anchor="middle" style="fill:#ffffff">5</text><rect x="437.9" y="90" width="43.3" height="30" rx="3" class="ane"><title>chunk 6: 6.86 ms</title></rect><text x="459.498" y="110" class="t4" text-anchor="middle" style="fill:#ffffff">6</text><rect x="483.1" y="90" width="23.1" height="30" rx="3" class="ane"><title>chunk 7: 3.8 ms</title></rect><text x="494.676" y="134" class="t4 halo" text-anchor="middle">head</text><text x="516.2159999999999" y="110" class="t3 num halo" text-anchor="start">52.8 ms (sum of medians)</text><text x="24" y="170" class="t2" text-anchor="start">Token interval<tspan dy="-5" font-size="9px">2</tspan></text><rect x="160.0" y="150" width="401.9" height="30" rx="3" class="neutral"/><text x="569.9399999999999" y="170" class="t3 num halo" text-anchor="start">60.7–61.1 ms per unpaced run → 16.4 tokens/s</text><text x="24" y="220" class="t2" text-anchor="start">Paced (fair state)<tspan dy="-5" font-size="9px">3</tspan></text><rect x="160.0" y="200" width="726.0" height="30" rx="3" fill="url(#hatch)"/><rect x="160.0" y="200" width="726.0" height="30" rx="3" fill="none" class="aneS"/><text x="160.0" y="250" class="t3 halo" text-anchor="start">at least 110 ms per token → about 9 tokens/s</text><text x="24" y="334" class="t3" text-anchor="start">1. Median of the 12 calls of each chunk in the placement recording; 0–6 are the layer chunks, then the vocabulary head.</text><text x="24" y="351" class="t3" text-anchor="start">2. Median token interval of each unpaced run in the performance procedure. Rows 1 and 2 come from different runs (of equivalent exports), so their difference is an</text><text x="38" y="368" class="t3" text-anchor="start">estimate, not a measurement.</text><text x="24" y="385" class="t3" text-anchor="start">3. Once the device is in the fair thermal state, the engine waits so that a token takes at least 110 ms.</text><text x="24" y="408" class="t3" text-anchor="start">The step is dominated by the eight Neural Engine calls; the rest is host work (lookups, KV write-back, sampling) and call overhead.</text>
+</svg>

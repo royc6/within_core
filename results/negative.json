@@ -1,0 +1,130 @@
+{
+ "claims": [
+  "Each row records an approach that was measured and rejected, with the device and conditions of the measurement."
+ ],
+ "rows": [
+  {
+   "id": "state-kv-with-compressed-weights",
+   "finding": "Single-layer graphs (Gemma 4 E4B layer 0, KV capacity 512) that keep KV as Core AI state fail Neural Engine compilation (\"MLIR MPS to ANEC conversion failed\") whenever they also contain sizeable compressed weights; the same layers with host-held KV compile and run.",
+   "probes": [
+    {
+     "device": "iPhone 17 Pro, iOS 27.0",
+     "failed": [
+      "INT8 whole layer + state",
+      "INT8 attention only + state",
+      "INT8 MLP only + state"
+     ],
+     "compiled": [
+      "FP16 + state",
+      "INT8 per-layer-embedding projections only + state",
+      "state update only",
+      "INT8 layer with host-held KV"
+     ]
+    },
+    {
+     "device": "iPhone 18 Pro, iOS 27.2",
+     "failed": [
+      "INT8 + state"
+     ],
+     "compiled": [
+      "FP16 + state",
+      "INT8 with host-held KV (1.5 ms per call)"
+     ]
+    },
+    {
+     "device": "iPhone 18 Pro, iOS 27.2",
+     "failed": [
+      "MLP lut6 + state",
+      "attention and MLP lut6 + state",
+      "shipped mix (INT8 attention and PLE, lut6 MLP) + state",
+      "MLP lut6 without per-channel scale + state",
+      "MLP lut4 with groups of 32 channels, no scale (Apple default iOS palettization preset) + state"
+     ]
+    }
+   ],
+   "scope": "established for this Gemma 4 layer graph; Apple's own iOS recipe combines palettized weights with state for other models",
+   "consequence": "KV is held by the host and bound as inputs on every call; KV capacity is fixed when the package is exported"
+  },
+  {
+   "id": "int8-does-not-fit",
+   "finding": "An all-INT8 package (4.65 GB of chunks) does not fit: the Neural Engine side holds about 1.3x the chunk bytes on this device and OS, and the process was terminated during prefill at capacity 4096.",
+   "earlier": "on the iPhone 17 Pro (iOS 27.0) about 3.4 GB of chunks loaded onto the Neural Engine in one process; the next chunk, whichever it was, failed to map and fell back to the GPU",
+   "earlierTokensPerSecond": 8.38,
+   "earlierChunksOnANE": 6,
+   "peakFootprintGB": 6.18,
+   "minimumAvailableGB": 0.27
+  },
+  {
+   "id": "four-bit-mlp-quality",
+   "finding": "4-bit MLP formats that the Neural Engine compiles exceed the quality limit (per-channel INT4 +0.286, lut4 +0.0997 nats/token on 18-20-item subsets); INT4 with blocks of 32 input channels does not convert for the Neural Engine at all (6 layers fell back to the GPU at 76-78 ms)."
+  },
+  {
+   "id": "head-inside-a-layer-chunk",
+   "finding": "In the first INT8 package (iPhone 17 Pro, iOS 27.0) the seventh chunk held layers 36-41 plus the vocabulary head (1.23 GB, the only chunk above 1 GB) and fell back to the GPU at 54 ms per call. After the head moved to its own chunk, the next chunk past about 3.4 GB of ANE-loaded chunks still failed, whichever it was, also when the earlier chunks came from the compile cache: the fallback is attributed to the process ANE capacity, not to the combined chunk size. As one output the head took 27 ms; as 16 row-slice outputs 14.4 ms (INT8)."
+  },
+  {
+   "id": "large-chunks-and-single-graph",
+   "finding": "A 12-layer chunk failed to specialize (cause not established); a single 42-layer FP8 graph specialized but function preparation pushed the footprint to 5.5-6.5 GB and the process was killed at the per-process limit; a staged FP16 graph failed Neural Engine compilation and fell back to a full GPU compile."
+  },
+  {
+   "id": "multi-capacity-packages",
+   "finding": "Packages carrying functions for several KV capacities over shared weights are slower than the single-capacity package at every capacity; the four-capacity package also peaked about 0.8 GB higher at 4096 (6.27 against 5.44 GB) and left 0.12-0.17 GB available.",
+   "rows": [
+    {
+     "package": "single 4096 @4096",
+     "tokensPerSecond": 19.5,
+     "peakGB": 5.44
+    },
+    {
+     "package": "two capacities @4096",
+     "tokensPerSecond": 12.3,
+     "peakGB": 5.23
+    },
+    {
+     "package": "single 16384 @16384",
+     "tokensPerSecond": 14.4,
+     "peakGB": 5.995
+    },
+    {
+     "package": "two capacities @16384",
+     "tokensPerSecond": 11.5,
+     "peakGB": 5.45
+    },
+    {
+     "package": "four capacities @4096",
+     "tokensPerSecond": 16.8,
+     "peakGB": 6.27
+    },
+    {
+     "package": "four capacities @16384",
+     "tokensPerSecond": 11.3,
+     "peakGB": 6.3
+    }
+   ],
+   "conditions": "iPhone 18 Pro, iOS 27.2, Debug, plugged in, 512 generated tokens per row; the two-capacity rows and the single-16384 row with a warm compile cache; all before output preallocation, so absolute speeds are lower than the shipped engine"
+  },
+  {
+   "id": "context-32k",
+   "finding": "A 32,000-token capacity does not fit on the iPhone 18 Pro: the four-capacity package at 32000 reached 6.44 GB and was terminated after 8 tokens. A 32,768-slot full-attention cache failed Neural Engine conversion even alone (GPU fallback, about 90 ms per call for 6 layers); 32,000 compiled.",
+   "attemptedMitigation": "allocating the host caches from the function's input descriptor gave the same contiguous layout and the same footprint (6.32 vs 6.31 GB at 32000): no zero-copy path for inputs was found in the public API"
+  },
+  {
+   "id": "gpu-backend-for-this-package",
+   "finding": "The shipped Neural Engine package loaded on Core AI's GPU backend is not usable: the first run was terminated after 84 s (reason vm-pageout-starvation; the file-backed weights were paged through on every token), and a second, warm run took 13-16 s per token.",
+   "scope": "this package on this backend; a model packaged for the GPU (LiteRT-LM) runs on the GPU at the speeds Google publishes"
+  },
+  {
+   "id": "strict-numerics-rule",
+   "finding": "The element-wise rule (|delta| <= 0.003 + 0.003|ref|, PSNR > 70 dB) cannot be met by FP16 execution of a 6-layer chunk: the Mac FP16 run of the same graph passes it on 9 of 71 outputs (Neural Engine 8, GPU 9). It is kept for single-operator checks; whole chunks are judged by PSNR >= 35 dB, cosine >= 0.999 and, for the head, top-1 and KL."
+  },
+  {
+   "id": "recompile-off-the-ane",
+   "finding": "A compiled chunk cached by the system can be a non-Neural-Engine plan: after an app update forced recompilation, chunk 0 ran at 24 ms instead of 8.9 ms and decode fell from 16.4 to 13.1 tokens/s; recompiling that chunk alone restored 8.9 ms. Earlier, the compiler service disconnecting mid-compile left a cached plan that ran chunk 0 at 97 ms.",
+   "consequence": "placement is a property of the compiled plan on the device, not of the package; it has to be re-checked after recompilation"
+  },
+  {
+   "id": "ungrouped-attention",
+   "finding": "Attention written per query head (cache replicated per head) is slower than per KV head: 6-layer step 8.65 vs 7.91 ms at 4096 and 15.09 vs 10.24 ms at 16384."
+  }
+ ]
+}

@@ -1,0 +1,35 @@
+# XcodeGen spec for the demo app: `xcodegen generate` writes WithinDemo.xcodeproj.
+name: WithinDemo
+options:
+  deploymentTarget:
+    iOS: '27.0'
+  createIntermediateGroups: true
+packages:
+  WithinCore:
+    path: ../..
+targets:
+  WithinDemo:
+    type: application
+    platform: iOS
+    sources: [Sources, Resources]
+    dependencies:
+      - package: WithinCore
+        product: WithinCore
+      - package: WithinCore
+        product: WithinCoreBase
+    entitlements:
+      path: WithinDemo.entitlements
+      properties:
+        # The decoder's Neural Engine staging needs the larger per-app memory limit.
+        com.apple.developer.kernel.increased-memory-limit: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.withincore.demo
+        SWIFT_VERSION: '6.0'
+        TARGETED_DEVICE_FAMILY: '1'
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: WithinCore Demo
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait

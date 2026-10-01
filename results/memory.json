@@ -1,0 +1,114 @@
+{
+ "claims": [
+  "The process may use 6 GiB (6,442,467,328 bytes) with the increased-memory-limit entitlement; the shipped configuration keeps the steady-state peak at 5.65-5.73 GB.",
+  "On this device and OS the Neural Engine side holds about 1.3x the chunk weight bytes, charged to the app process.",
+  "The transient peak of the first decode steps after a load was caused by per-call output allocation; binding preallocated outputs removed it."
+ ],
+ "budget": {
+  "processLimitBytes": 6442467328,
+  "note": "footprint + available memory at the start of the sustained run; increased-memory-limit entitlement",
+  "steadyStateTarget": 6000000000,
+  "minimumAvailableTarget": 200000000
+ },
+ "components": {
+  "chunkFileBytes": 3496985782,
+  "neuralEngineResidency": {
+   "ratioToChunkBytes": 1.3,
+   "measurement": "lut6 package with capacity 4096: 3.57 GB of chunk files, 4.69 GB in the neural footprint ledger at the peak; app-owned VM regions about 0.85 GB",
+   "otherDevice": "about 1.06x on an iPhone 17 Pro with iOS 27.0",
+   "formatIndependent": "an INT8 package (4.65 GB of chunks) reached 6.18 GB at its first inference and was terminated during prefill"
+  },
+  "hostKVBytes": 289406976,
+  "embeddingTables": {
+   "bytes": 6979321856,
+   "residency": "memory-mapped read-only; only the rows of the tokens being processed are read"
+  },
+  "perTokenOutputAllocation": {
+   "beforeMiBPerToken": 23.2,
+   "afterMiBPerToken": 2.9,
+   "change": "step_1 outputs bound to arrays allocated once at load (run with output views)",
+   "headChunkMsBeforeAfter": [
+    7.2,
+    3.6
+   ]
+  }
+ },
+ "peaks": [
+  {
+   "scenario": "shipped configuration, 11-minute sustained run (Release)",
+   "peakFootprintBytes": 5729605576,
+   "minimumAvailableBytes": 712845368
+  },
+  {
+   "scenario": "shipped package, cold start, 512 tokens (Debug -O)",
+   "peakFootprintBytes": 5648453968,
+   "minimumAvailableBytes": 794000000
+  },
+  {
+   "scenario": "capacity 16384, cold start, 512 tokens, outputs preallocated (Debug)",
+   "peakFootprintGB": 5.692,
+   "minimumAvailableGB": 0.75
+  },
+  {
+   "scenario": "capacity 16384, cold start, 13.7K-token prompt, outputs preallocated (Debug)",
+   "peakFootprintGB": 5.72,
+   "minimumAvailableGB": 0.723
+  },
+  {
+   "scenario": "capacity 16384, reload and KV restore, outputs preallocated (Debug)",
+   "peakFootprintGB": 5.669,
+   "minimumAvailableGB": 0.774
+  },
+  {
+   "scenario": "capacity 16384, cold start, 512 tokens, per-call outputs (Debug)",
+   "peakFootprintGB": 5.985,
+   "minimumAvailableGB": 0.457
+  },
+  {
+   "scenario": "capacity 16384, first decode after a 13.6K-token prompt, per-call outputs (Debug)",
+   "peakFootprintGB": 6.195,
+   "minimumAvailableGB": 0.248
+  },
+  {
+   "scenario": "capacity 16384, first decode after reload and KV restore, per-call outputs (Debug)",
+   "peakFootprintGB": 6.303,
+   "minimumAvailableGB": 0.139
+  },
+  {
+   "scenario": "capacity 16384, steady state mid-conversation, per-call outputs (Debug)",
+   "peakFootprintGB": [
+    5.82,
+    5.95
+   ]
+  },
+  {
+   "scenario": "capacity 4096, cold start, 512 tokens, outputs preallocated (Debug)",
+   "peakFootprintGB": 5.027,
+   "minimumAvailableGB": 1.415
+  },
+  {
+   "scenario": "four-capacity package at 16384 (Debug)",
+   "peakFootprintGB": 6.3,
+   "minimumAvailableGB": 0.14
+  },
+  {
+   "scenario": "four-capacity package at 32000 (Debug)",
+   "peakFootprintGB": 6.44,
+   "minimumAvailableGB": 0.0,
+   "outcome": "terminated by the system after 8 tokens"
+  },
+  {
+   "scenario": "all-INT8 package, capacity 4096 (Debug)",
+   "peakFootprintGB": 6.18,
+   "minimumAvailableGB": 0.27,
+   "outcome": "terminated during prefill"
+  }
+ ],
+ "conditions": {
+  "device": {
+   "model": "iPhone 18 Pro",
+   "identifier": "iPhone19,2",
+   "os": "iOS 27.2 (24B5089g)"
+  }
+ }
+}

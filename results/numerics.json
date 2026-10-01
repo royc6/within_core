@@ -1,0 +1,377 @@
+{
+ "claims": [
+  "Per call, every one of the 71 outputs of the 8 chunks computed on the Neural Engine is within PSNR >= 35 dB and cosine >= 0.999 of an FP32 recomputation of the same quantized graph on the same input bytes; the head keeps the top-1 token with KL 8.5e-5 nats over the full vocabulary.",
+  "The Neural Engine, the GPU and an FP16 run of the same graph on the Mac are at the same error level; the Core AI CPU arm is not (16 of 71 outputs fail), so the rule separates correct from incorrect execution.",
+  "The earlier element-wise rule (|delta| <= 0.003 + 0.003|ref| and PSNR > 70 dB) is not attainable for FP16 execution of this graph: the Mac FP16 run of the same graph passes it on 9 of 71 outputs.",
+  "Across the whole chain (lookups, 8 chunks, host KV with ring buffers, prefill plan), teacher-forced NLL on the phone matches an independent full-sequence FP16 recomputation to within 0.0047 nats/token on 28 items."
+ ],
+ "perCall": {
+  "conditions": {
+   "device": {
+    "model": "iPhone 18 Pro",
+    "identifier": "iPhone19,2",
+    "os": "iOS 27.2 (24B5089g)"
+   },
+   "appBuild": "Release",
+   "package": "lut6-c16384-20260930-01",
+   "appliesTo": "lut6-c16384-20261001-01",
+   "inputs": "the round-0 inputs and outputs of the placement recording (placement.json), dumped by the app outside the measured windows",
+   "reference": "each chunk rebuilt on the Mac from the checkpoint with the exporter's own quantization (lut6 MLP, INT8 attention and PLE, w4 head, grouped attention) and evaluated in FP32 on the phone's input bytes: the same representation in near-exact arithmetic (PyTorch CPU; no Core AI execution on the Mac)",
+   "macFP16": "the same rebuilt graph evaluated in FP16 on the Mac, scored as a fourth arm"
+  },
+  "criterion": "each output of the candidate arm: PSNR >= 35 dB and cosine >= 0.999 against the FP32 recomputation; head: same top-1 token and KL <= 0.001 nats over the full vocabulary",
+  "outputsChecked": 71,
+  "failingOutputs": {
+   "neuralEngine": 0,
+   "gpu": 0,
+   "cpu": 16,
+   "macFP16": 0
+  },
+  "strictElementwiseRulePasses": {
+   "neuralEngine": 8,
+   "gpu": 9,
+   "cpu": 0,
+   "macFP16": 9
+  },
+  "outputsAbove70dB": {
+   "neuralEngine": 12,
+   "gpu": 29,
+   "cpu": 0,
+   "macFP16": 29
+  },
+  "perChunk": [
+   {
+    "chunk": 0,
+    "outputs": 13,
+    "outputNames": [
+     "fresh_key",
+     "fresh_value",
+     "hidden"
+    ],
+    "neuralEngine": {
+     "minPSNRdB": 48.3,
+     "minCosine": 0.999892,
+     "maxRelativeL2": 0.0147
+    },
+    "gpu": {
+     "minPSNRdB": 46.9,
+     "minCosine": 0.999735,
+     "maxRelativeL2": 0.023
+    },
+    "cpu": {
+     "minPSNRdB": 25.2,
+     "minCosine": 0.941976,
+     "maxRelativeL2": 0.3398
+    },
+    "macFP16": {
+     "minPSNRdB": 54.2,
+     "minCosine": 0.999952,
+     "maxRelativeL2": 0.0098
+    }
+   },
+   {
+    "chunk": 1,
+    "outputs": 13,
+    "outputNames": [
+     "fresh_key",
+     "fresh_value",
+     "hidden"
+    ],
+    "neuralEngine": {
+     "minPSNRdB": 55.9,
+     "minCosine": 0.999959,
+     "maxRelativeL2": 0.0091
+    },
+    "gpu": {
+     "minPSNRdB": 54.9,
+     "minCosine": 0.999969,
+     "maxRelativeL2": 0.0079
+    },
+    "cpu": {
+     "minPSNRdB": 37.4,
+     "minCosine": 0.998965,
+     "maxRelativeL2": 0.0455
+    },
+    "macFP16": {
+     "minPSNRdB": 54.4,
+     "minCosine": 0.999968,
+     "maxRelativeL2": 0.0081
+    }
+   },
+   {
+    "chunk": 2,
+    "outputs": 13,
+    "outputNames": [
+     "fresh_key",
+     "fresh_value",
+     "hidden"
+    ],
+    "neuralEngine": {
+     "minPSNRdB": 45.6,
+     "minCosine": 0.999063,
+     "maxRelativeL2": 0.0433
+    },
+    "gpu": {
+     "minPSNRdB": 52.4,
+     "minCosine": 0.999926,
+     "maxRelativeL2": 0.0121
+    },
+    "cpu": {
+     "minPSNRdB": 37.3,
+     "minCosine": 0.994197,
+     "maxRelativeL2": 0.1076
+    },
+    "macFP16": {
+     "minPSNRdB": 50.4,
+     "minCosine": 0.99979,
+     "maxRelativeL2": 0.0205
+    }
+   },
+   {
+    "chunk": 3,
+    "outputs": 13,
+    "outputNames": [
+     "fresh_key",
+     "fresh_value",
+     "hidden"
+    ],
+    "neuralEngine": {
+     "minPSNRdB": 55.1,
+     "minCosine": 0.999842,
+     "maxRelativeL2": 0.0178
+    },
+    "gpu": {
+     "minPSNRdB": 55.2,
+     "minCosine": 0.999958,
+     "maxRelativeL2": 0.0092
+    },
+    "cpu": {
+     "minPSNRdB": 36.7,
+     "minCosine": 0.992097,
+     "maxRelativeL2": 0.1257
+    },
+    "macFP16": {
+     "minPSNRdB": 52.9,
+     "minCosine": 0.999901,
+     "maxRelativeL2": 0.014
+    }
+   },
+   {
+    "chunk": 4,
+    "outputs": 1,
+    "outputNames": [
+     "hidden"
+    ],
+    "neuralEngine": {
+     "minPSNRdB": 75.1,
+     "minCosine": 0.999982,
+     "maxRelativeL2": 0.006
+    },
+    "gpu": {
+     "minPSNRdB": 80.7,
+     "minCosine": 0.999995,
+     "maxRelativeL2": 0.0031
+    },
+    "cpu": {
+     "minPSNRdB": 59.4,
+     "minCosine": 0.999346,
+     "maxRelativeL2": 0.0362
+    },
+    "macFP16": {
+     "minPSNRdB": 79.9,
+     "minCosine": 0.999994,
+     "maxRelativeL2": 0.0034
+    }
+   },
+   {
+    "chunk": 5,
+    "outputs": 1,
+    "outputNames": [
+     "hidden"
+    ],
+    "neuralEngine": {
+     "minPSNRdB": 76.6,
+     "minCosine": 0.999992,
+     "maxRelativeL2": 0.0042
+    },
+    "gpu": {
+     "minPSNRdB": 73.9,
+     "minCosine": 0.999984,
+     "maxRelativeL2": 0.0057
+    },
+    "cpu": {
+     "minPSNRdB": 60.6,
+     "minCosine": 0.999649,
+     "maxRelativeL2": 0.0265
+    },
+    "macFP16": {
+     "minPSNRdB": 74.6,
+     "minCosine": 0.999986,
+     "maxRelativeL2": 0.0053
+    }
+   },
+   {
+    "chunk": 6,
+    "outputs": 1,
+    "outputNames": [
+     "hidden"
+    ],
+    "neuralEngine": {
+     "minPSNRdB": 83.4,
+     "minCosine": 0.999997,
+     "maxRelativeL2": 0.0024
+    },
+    "gpu": {
+     "minPSNRdB": 87.1,
+     "minCosine": 0.999999,
+     "maxRelativeL2": 0.0016
+    },
+    "cpu": {
+     "minPSNRdB": 69.5,
+     "minCosine": 0.999931,
+     "maxRelativeL2": 0.0117
+    },
+    "macFP16": {
+     "minPSNRdB": 86.2,
+     "minCosine": 0.999999,
+     "maxRelativeL2": 0.0017
+    }
+   },
+   {
+    "chunk": 7,
+    "outputs": 16,
+    "outputNames": [
+     "logits"
+    ],
+    "neuralEngine": {
+     "minPSNRdB": 60.9,
+     "minCosine": 0.999999,
+     "maxRelativeL2": 0.002
+    },
+    "gpu": {
+     "minPSNRdB": 79.3,
+     "minCosine": 1.0,
+     "maxRelativeL2": 0.0003
+    },
+    "cpu": {
+     "minPSNRdB": 68.2,
+     "minCosine": 1.0,
+     "maxRelativeL2": 0.001
+    },
+    "macFP16": {
+     "minPSNRdB": 74.8,
+     "minCosine": 1.0,
+     "maxRelativeL2": 0.0004
+    }
+   }
+  ],
+  "head": {
+   "neuralEngine": {
+    "top1Equal": true,
+    "top1": 11697,
+    "klNats": 8.515849809461037e-05,
+    "top10Overlap": 10
+   },
+   "gpu": {
+    "top1Equal": true,
+    "top1": 11697,
+    "klNats": 3.874051665090592e-06,
+    "top10Overlap": 10
+   },
+   "cpu": {
+    "top1Equal": true,
+    "top1": 11697,
+    "klNats": 3.8807798458742344e-05,
+    "top10Overlap": 10
+   },
+   "macFP16": {
+    "top1Equal": true,
+    "top1": 11697,
+    "klNats": 3.345420729546208e-05,
+    "top10Overlap": 10
+   }
+  },
+  "thinnestMargin": {
+   "chunk": 2,
+   "output": "hidden",
+   "neuralEngine": {
+    "cosine": 0.999063,
+    "relativeL2": 0.0433
+   },
+   "gpu": {
+    "cosine": 0.999926,
+    "relativeL2": 0.0121
+   },
+   "cpu": {
+    "cosine": 0.994197,
+    "relativeL2": 0.1076
+   },
+   "macFP16": {
+    "cosine": 0.99979,
+    "relativeL2": 0.0205
+   }
+  },
+  "worstCPUArm": {
+   "minPSNRdB": 25.2,
+   "minCosine": 0.942,
+   "chunksWithAFailingOutput": [
+    0,
+    1,
+    2,
+    3
+   ]
+  },
+  "passed": true
+ },
+ "wholeChain": {
+  "conditions": {
+   "device": {
+    "model": "iPhone 17 Pro",
+    "os": "iOS 27.0"
+   },
+   "appBuild": "Debug",
+   "package": "development package (not published)",
+   "packageNote": "same chunking and weight formats as the shipped package, KV capacity 4096 instead of 16384",
+   "phone": "teacher-forced NLL from the product engine (host KV, 512-slot sliding rings, prefill_16 / step_1 plan)",
+   "reference": "independent Mac PyTorch FP16 recomputation with the exporter's rounding, whole sequence in one pass, no ring buffer"
+  },
+  "items": 28,
+  "subsets": [
+   "boundary",
+   "code",
+   "en",
+   "long",
+   "multi",
+   "zh"
+  ],
+  "tolerance": 0.005,
+  "maxAbsDifference": 0.0047,
+  "worstItemKind": "prefill ending exactly at the 512-token window",
+  "maxAbsDifferenceNonBoundaryItems": 0.0022,
+  "boundaryItems": {
+   "count": 6,
+   "positions": "cut from one long frozen prompt: prefill ending at 511, 512 and 513; decode stepping across 511-513; decode across the second wrap of the ring (1023-1025); a control inside the window at 300; 48 scored tokens each",
+   "maxAbsDifference": 0.0047,
+   "differenceByItem": {
+    "control-300": 0.0001,
+    "prefill-511": 0.0042,
+    "prefill-512": 0.0047,
+    "prefill-513": 0.0018,
+    "step-1000": 0.0008,
+    "step-490": 0.0039
+   },
+   "itemsCrossingThe512Boundary": [
+    "prefill-511",
+    "prefill-512",
+    "step-490"
+   ],
+   "crossingItemsShareOfTolerance": [
+    0.772,
+    0.944
+   ]
+  },
+  "itemsOverTolerance": 0,
+  "passed": true,
+  "auditNote": "recomputed independently from the raw receipts by three separate scripts with identical results"
+ }
+}

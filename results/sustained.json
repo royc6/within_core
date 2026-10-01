@@ -1,0 +1,161 @@
+{
+ "claims": [
+  "An 11-minute, 20-turn single conversation on battery in airplane mode completed with no crash or memory termination, a steady peak footprint of 5.73 GB and at least 0.71 GB always available.",
+  "The device stayed in the fair thermal state from about 1 minute on and never reached serious or critical; decode was paced at about 110 ms per token from the fourth turn on."
+ ],
+ "workload": {
+  "turns": 20,
+  "tokensPerTurn": 256,
+  "pauseSecondsBetweenTurns": 5,
+  "minimumWallSeconds": 600,
+  "prompts": "12 fixed prompts (English and Chinese) in a fixed order, one conversation",
+  "sampling": {
+   "temperature": 0.7,
+   "topK": 64,
+   "topP": 0.95
+  },
+  "thinking": false,
+  "environment": "airplane mode, screen on at 50% brightness, unplugged, battery 85% at start, nominal thermal state at start, Release build",
+  "ambientTemperature": "not recorded"
+ },
+ "conditions": {
+  "device": {
+   "model": "iPhone 18 Pro",
+   "identifier": "iPhone19,2",
+   "os": "iOS 27.2 (24B5089g)"
+  },
+  "appBuild": "Release",
+  "package": "lut6-c16384-20260930-01",
+  "appliesTo": "lut6-c16384-20261001-01",
+  "contextLimit": 16384
+ },
+ "results": {
+  "wallSeconds": 660,
+  "turns": 20,
+  "outputTokens": 5120,
+  "crashFree": true,
+  "previousUncleanLaunches": 0,
+  "peakFootprintBytes": 5729605576,
+  "peakAtSecond": 283,
+  "minimumAvailableBytes": 712845368,
+  "processLimitBytes": 6442467328,
+  "thermalSamples": {
+   "every": "5 s",
+   "total": 129,
+   "nominal": 12,
+   "fair": 117,
+   "serious": 0,
+   "critical": 0
+  },
+  "firstFairAtSecond": 62,
+  "longestContinuousSeriousSeconds": 0,
+  "medianIntervalMsByTurn": [
+   61.1,
+   60.9,
+   62.9,
+   111.2,
+   110.5,
+   111.0,
+   110.6,
+   110.8,
+   111.1,
+   110.8,
+   111.5,
+   110.9,
+   110.4,
+   110.2,
+   110.4,
+   111.1,
+   110.8,
+   109.9,
+   111.2,
+   110.6
+  ],
+  "firstTokenMsByTurn": [
+   2735,
+   473,
+   490,
+   504,
+   489,
+   5243,
+   744,
+   716,
+   473,
+   9317,
+   672,
+   485,
+   524,
+   478,
+   408,
+   510,
+   377,
+   445,
+   591,
+   555
+  ],
+  "promptTokensByTurn": [
+   24,
+   304,
+   582,
+   863,
+   1141,
+   1419,
+   1702,
+   1984,
+   2264,
+   2544,
+   2828,
+   3108,
+   3389,
+   3669,
+   3947,
+   4228,
+   4505,
+   4784,
+   5067,
+   5349
+  ],
+  "reusedTokensByTurn": [
+   0,
+   279,
+   559,
+   837,
+   1118,
+   0,
+   1674,
+   1957,
+   2239,
+   0,
+   2799,
+   3083,
+   3363,
+   3644,
+   3924,
+   4202,
+   4483,
+   4760,
+   5039,
+   5322
+  ],
+  "continuationTurnsWithoutKVReuse": 2,
+  "continuationTurns": 19,
+  "processCPUSeconds": 159.1,
+  "energy": "not measurable: the reported battery level stayed at 85% for the whole run",
+  "passed": true
+ },
+ "pacing": {
+  "policy": "the generation loop waits so that a token takes at least 110 ms in the fair state and 200 ms in the serious or critical state; none in nominal",
+  "reason": "once the device reaches serious it stays there for minutes even at reduced speed; with 92 ms pacing at fair, a plugged-in Debug run of the lut6 package reached serious at 484 s and stayed there 204 s (limit 120 s); with 110 ms the later runs, including this one, did not leave fair",
+  "reasonSource": "docs/history/HANDOFF-2026-09.md",
+  "code": "Core/Sources/WithinCore/Gemma4Engine.swift"
+ },
+ "limits": {
+  "peakFootprintBytesSteadyState": 6000000000,
+  "minimumAvailableBytes": 200000000,
+  "thermal": "never critical; serious for at most 120 s continuously"
+ },
+ "cacheReuse": {
+  "withoutThinking": "a new prompt that extends exactly the cached tokens is fed incrementally; it fails when the chat template trims the assistant text and the generated tokens re-tokenize differently: about one turn in eight in development use, 2 of 19 in this run",
+  "withThinking": "the previous turn's thinking text is not kept in the history, so the prompt never extends the cached tokens and every turn re-prefills the conversation"
+ }
+}
