@@ -4,7 +4,7 @@
 
 ## English
 
-**Effective date:** September 30, 2026
+**Effective date:** October 1, 2026
 
 within is an AI chat app that generates replies on your iPhone. This policy explains what data the
 app handles and where it goes.
@@ -43,8 +43,9 @@ Inference runs offline. You can use within in airplane mode after the model is d
 ### Your choices
 
 - **Turn off Sync with iCloud** in Settings. Data already in iCloud stays there until you delete it.
-- **Clear chats from this iPhone** in Settings removes chats from this iPhone only. Sync turns off
-  first so they do not return; chats already in iCloud stay there.
+- **Clear chats from this phone** in Settings removes chats from this iPhone only. Sync stays as it
+  is and your iCloud copy is not changed; Sync now or turning sync on brings those chats back. Chats
+  that are not in iCloud can't be recovered.
 - **Delete all chats** in Settings deletes your chats on this iPhone and in iCloud. With sync on,
   the deletion also reaches your other devices.
 - **Delete the model** in the Model screen, or delete the app to remove all of its local data.
@@ -65,7 +66,7 @@ within@royomni.com
 
 ## 简体中文
 
-**生效日期：** 2026 年 9 月 30 日
+**生效日期：** 2026 年 10 月 1 日
 
 within 是一款在你的 iPhone 上生成回复的 AI 聊天应用。本政策说明应用处理哪些数据、数据去向何处。
 
@@ -92,8 +93,8 @@ within 只在以下情况联网：
 ### 你的选择
 
 - 在「设置」中关闭**通过 iCloud 同步**。已在 iCloud 中的数据会保留，直到你删除。
-- 「设置」中的**清除本机聊天**只删除本机上的聊天：会先关闭同步，避免数据回流；已在 iCloud 中的聊天保留。
-- 「设置」中的**删除所有聊天**会删除本机和 iCloud 中的聊天；同步开启时，删除也会同步到你的其他设备。
+- 「设置」中的**清除本机聊天**只删除本机上的聊天：同步开关不变，iCloud 中的副本不受影响；点「立即同步」或重新打开同步后，这些聊天会回来。不在 iCloud 中的聊天无法恢复。
+- 「设置」中的**删除全部聊天**会删除本机和 iCloud 中的聊天；同步开启时，删除也会同步到你的其他设备。
 - 在模型页面**删除模型**，或删除应用以移除其全部本地数据。
 
 ### 儿童
