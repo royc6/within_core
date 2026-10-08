@@ -1,0 +1,600 @@
+{
+ "claims": [
+  "KV-SLIDE: when a conversation outgrows the KV capacity the engine evicts the oldest tokens after the head in blocks of 128 slots and continues the cache, instead of trimming the conversation to half and prefilling it again. On the Lite 32K package the turn in which a 22-turn conversation first exceeded 32,000 tokens went from 35.8 s to 5.3 s to the first token; on the Lite 4K package every turn after the third slides and the first token stays at 0.7-2.5 s with decode unchanged.",
+  "Against a reference recomputation on the Mac, facts that both v1's trim and KV-SLIDE keep are answered equally (numbers 74/74 against 74/74; words, judged among the planted candidates, 49/50 against 50/50); facts only KV-SLIDE still holds are answered 44/44 against 2/44; evicted facts never return (0 of 48 in either arm); health NLL is 0.0145 nats/token higher with the old K/V kept in place (limit 0.02). The frozen accuracy rule (5 points) was missed by 0.4 points on the original word scoring, where the difference is a bold marker, not a memory.",
+  "Thinking continuation: after a reply the hidden thought channel leaves the cache, its slots are freed and its positions stay unused; the next prompt extends the answer's K/V. On the Full package a 5-turn Thinking conversation reuses 139-231 of 162-253 input tokens from turn 2 on, first token 0.17-0.18 s; on the Mac, planted facts 72/72 clean against 72/72 with the gap, health NLL +0.0034.",
+  "PREFIX-KV: the K/V of a prompt's head (bos and the system turn) is written to a file the first time a clean start renders it and read back by later clean starts. On the Full package a new conversation with a 317-token system prompt goes from 3.3 s (prefill of 340 tokens) to 0.19 s to the first token; 317 of 340 tokens are reused. Thinking on or off has its own head.",
+  "A reply stopped while it decodes keeps the cache: on the Full package the turn after a stop reused 996 of 1,018 and 1,192 of 1,214 tokens (first token 1.17-1.20 s) instead of prefilling the conversation again."
+ ],
+ "conditions": {
+  "device": {
+   "model": "iPhone 18 Pro",
+   "identifier": "iPhone19,2",
+   "os": "iOS 27.2"
+  },
+  "builds": "lab Debug builds (-O) for the acceptance runs, Release for the fill tests; wired; October 2026",
+  "engine": "within_core 1.1.0"
+ },
+ "kvSlide": {
+  "mechanism": "full-attention caches get a slot table (Gemma4SlotTable): writes go to assigned slots, the global mask comes from the table, evict(positions) frees slots; the head (bos and the system turn, found by a probe rendering) is never evicted; sliding-attention layers see a ring mask that hides positions the table no longer holds; positions run to the model's 131,072; eviction is by blocks of 128 slots, and never from the latest turn",
+  "fillTest": {
+   "workload": "one conversation of 22 turns; each user turn is a document excerpt of about 1,900 tokens, 64 generated tokens, 1 s apart; temperature 0.7, top-K 64, top-P 0.95; Release builds",
+   "rows": [
+    {
+     "package": "qat-lut-srq-p128-c32000-20261002-01",
+     "capacity": 32000,
+     "before": {
+      "turn18FirstTokenSeconds": 35.8,
+      "turn18Note": "v1 trim: the conversation cut to 15,302 tokens and prefilled again",
+      "turns19to22FirstTokenSeconds": [
+       5.3,
+       5.6,
+       5.0,
+       4.0
+      ],
+      "wallSeconds": 268,
+      "peakFootprintGB": 4.88,
+      "minimumAvailableGB": 1.56,
+      "source": "phone-sustained-fill-32k-20261003-02 (archived)"
+     },
+     "kvSlide": {
+      "turn18FirstTokenSeconds": 5.3,
+      "turn18Note": "about 2,100 new tokens fed, 29,863 reused; the cache holds 32,000 from then on",
+      "turns19to22FirstTokenSeconds": [
+       5.3,
+       5.3,
+       4.7,
+       3.8
+      ],
+      "decodeIntervalMsFull": 76.6,
+      "decodeIntervalMsBefore": 76.6,
+      "wallSeconds": 232,
+      "peakFootprintGB": 4.89,
+      "minimumAvailableGB": 1.56,
+      "source": "phone-sustained-fill-32k-20261003-04 (archived)"
+     },
+     "note": "turns 1-17 identical to the earlier run turn for turn (input tokens, reused tokens, first token, intervals)"
+    },
+    {
+     "package": "qat-lut-srq-p128-c4096-20261002-01",
+     "capacity": 4096,
+     "kvSlide": {
+      "slidingFromTurn": 3,
+      "firstTokenSecondsRange": [
+       0.7,
+       2.5
+      ],
+      "decodeIntervalMs": 36.3,
+      "finalPosition": "about 42,000, ten times the slot count",
+      "peakFootprintGB": 3.27,
+      "wallSeconds": 118,
+      "source": "phone-sustained-fill-4k-20261003-05 and -06 (archived; block sliding, two complete runs with the same per-turn input and reuse counts)"
+     },
+     "note": "v1 prefilled the whole conversation again every turn of this workload"
+    }
+   ]
+  },
+  "comparison": {
+   "method": "teacher forcing in transformers on the Mac with the engine's cache reproduced row by row (one mask row per token; evicted entries deleted from the four global-layer caches); activations clamped as in the lite packages (clamp mode); 10 scripted conversations (5 English, 5 Chinese, 133K tokens in all), window 4,096 with 1,024 reserved for the reply, 24 question points at 1.5x, 2.5x and 4.4x the window; 267 fact questions and 72 health questions (the frozen set's items with their 128 reference tokens)",
+   "arms": {
+    "A": "v1: trim to half the window and prefill clean",
+    "B": "KV-SLIDE as in the engine",
+    "Bm": "B's cache with A's trimmed part masked at the question",
+    "Ap": "A's content prefilled clean at B's positions",
+    "Af": "Ap shifted by 100,000 positions"
+   },
+   "setSHA256": "a2214c774c535a6f0e5f6478368adab68b45074013be80ca527b5de0d7f3d316",
+   "referencesSHA256": "9880394ec5f99e1c54aa2f225b70b4cd9e671a3eb5f5e9e38609026844512d13",
+   "accuracy": {
+    "NEAR numbers": {
+     "questions": 6,
+     "A": 1.0,
+     "B": 1.0
+    },
+    "NEAR words": {
+     "questions": 13,
+     "A": 0.7692,
+     "B": 0.6154
+    },
+    "FAR numbers": {
+     "questions": 43,
+     "A": 1.0,
+     "B": 1.0
+    },
+    "FAR words": {
+     "questions": 62,
+     "A": 0.5968,
+     "B": 0.5
+    },
+    "HEAD numbers": {
+     "questions": 10,
+     "A": 1.0,
+     "B": 1.0
+    },
+    "UPDATE numbers": {
+     "questions": 15,
+     "A": 1.0,
+     "B": 1.0
+    },
+    "BONLY numbers": {
+     "questions": 26,
+     "A": 0.0,
+     "B": 1.0
+    },
+    "BONLY words": {
+     "questions": 44,
+     "A": 0.0,
+     "B": 0.3864
+    },
+    "LOST numbers": {
+     "questions": 16,
+     "A": 0.0,
+     "B": 0.0
+    },
+    "LOST words": {
+     "questions": 32,
+     "A": 0.0,
+     "B": 0.0
+    }
+   },
+   "kept": {
+    "facts": 149,
+    "accuracyA": 0.8121,
+    "accuracyB": 0.7584,
+    "gap": 0.0537,
+    "onlyARight": 8,
+    "onlyBRight": 0
+   },
+   "keptNumbers": {
+    "facts": 74,
+    "A": 1.0,
+    "B": 1.0
+   },
+   "keptWordsAmongPlanted": {
+    "facts": 50,
+    "A": 1.0,
+    "B": 0.98,
+    "note": "scoring among the planted candidate values, recorded for the last 15 question points only; added after a review found that the original word scoring charged a bold marker (**) ranked first as a miss"
+   },
+   "health": {
+    "questions": 72,
+    "nllA": 0.4592,
+    "nllB": 0.4737,
+    "gap": 0.0145,
+    "gapUpper95": 0.0223,
+    "decomposition": {
+     "moreContext": -0.009,
+     "oldKVNotRecomputed": 0.021,
+     "positionGap": 0.002
+    }
+   },
+   "shift": {
+    "note": "Af - Ap: the same content 100,000 positions later; 39 fact and 18 health questions over 6 question points",
+    "accuracyA": 0.7436,
+    "accuracyB": 0.7436,
+    "healthNLLGap": -0.0002,
+    "passed": true
+   },
+   "updatedFacts": {
+    "questions": 15,
+    "A": 1.0,
+    "B": 1.0,
+    "note": "old value evicted, new value kept; neither arm answered the old value"
+   },
+   "frozenRule": {
+    "keptAccuracyLossLimit": 0.05,
+    "healthNLLLimit": 0.02,
+    "passed": false,
+    "note": "the kept-accuracy gap is 0.054 on the original scoring (A 121/149, B 113/149); all 8 misses are word questions whose top token is a bold marker in B; on the candidate scoring the gap is 0.02 (49/50 against 50/50)"
+   },
+   "thinking": {
+    "conversations": 6,
+    "facts": 72,
+    "health": 12,
+    "amongPlanted": {
+     "clean": 1.0,
+     "evicted": 1.0
+    },
+    "exactNumbers": {
+     "clean": 1.0,
+     "evicted": 1.0
+    },
+    "healthNLL": {
+     "clean": 0.4543,
+     "evicted": 0.4577,
+     "gap": 0.0034
+    },
+    "note": "scripted thoughts of 578-1,068 tokens removed after each reply (evicted) against a clean prefill of the conversation without the thoughts (clean)"
+   },
+   "source": "kv-slide-comparison-v1: report-clamp.json and thinking-clamp.json (private run folder; script kv_slide_comparison.py)",
+   "laterChange": "the engine switched from per-token to block eviction after this comparison; each prefill call then sees at least as much old context and a reply at most 127 fewer of the oldest tokens; not rerun",
+   "onlyKVSlideKeeps": {
+    "facts": 70,
+    "originalScoring": {
+     "A": 0.0,
+     "B": 0.6143
+    },
+    "amongPlanted": {
+     "facts": 44,
+     "A": 0.0455,
+     "B": 1.0
+    },
+    "note": "facts that v1's trim has cut and KV-SLIDE still holds"
+   },
+   "neitherKeeps": {
+    "facts": 48,
+    "originalScoring": {
+     "A": 0.0,
+     "B": 0.0
+    },
+    "amongPlanted": {
+     "facts": 30,
+     "A": 0.1,
+     "B": 0.0667,
+     "note": "chance level: evicted content does not come back through old K/V"
+    }
+   }
+  }
+ },
+ "thinkingContinuation": {
+  "procedure": "a 5-turn arithmetic conversation with Thinking on (17 x 23, add 9, double, what was the first question, which number); temperature 1, top-K 64; firstTokenSeconds of turn 0 includes the model's load",
+  "runs": {
+   "phone-accept-thinking-full-20261005-01": {
+    "revision": "lut6-c16384-20261001-01",
+    "turns": [
+     {
+      "newConversation": true,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 37,
+      "reusedTokens": 0,
+      "firstTokenSeconds": 103.636
+     },
+     {
+      "newConversation": false,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 162,
+      "reusedTokens": 139,
+      "firstTokenSeconds": 0.18
+     },
+     {
+      "newConversation": false,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 184,
+      "reusedTokens": 165,
+      "firstTokenSeconds": 0.17
+     },
+     {
+      "newConversation": false,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 210,
+      "reusedTokens": 187,
+      "firstTokenSeconds": 0.174
+     },
+     {
+      "newConversation": false,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 253,
+      "reusedTokens": 231,
+      "firstTokenSeconds": 0.172
+     }
+    ]
+   },
+   "phone-accept-thinking-balanced-20261005-01": {
+    "revision": "lut6-c4096-20261001-01",
+    "turns": [
+     {
+      "newConversation": true,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 51,
+      "reusedTokens": 0,
+      "firstTokenSeconds": 2.232
+     },
+     {
+      "newConversation": false,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 88,
+      "reusedTokens": 65,
+      "firstTokenSeconds": 0.133
+     },
+     {
+      "newConversation": false,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 110,
+      "reusedTokens": 91,
+      "firstTokenSeconds": 0.13
+     },
+     {
+      "newConversation": false,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 136,
+      "reusedTokens": 113,
+      "firstTokenSeconds": 0.147
+     },
+     {
+      "newConversation": false,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 179,
+      "reusedTokens": 157,
+      "firstTokenSeconds": 0.129
+     }
+    ]
+   }
+  }
+ },
+ "prefixKV": {
+  "procedure": "six turns with a 317-token system prompt (a bookshop's instructions): a new conversation, the same new conversation again, a continuation, a new conversation with Thinking on twice, a new conversation with another question; firstTokenSeconds of turn 0 of run -04 and -05 includes the model's load (cold compile in -05)",
+  "headTokens": 317,
+  "store": "Caches/PrefixKV/<package>/<sha256 of the head's tokens>: each cache's first min(K, slots) slots, checked for size and finite values on the way in; two files kept",
+  "runs": {
+   "phone-accept-prefix-full-20261005-03": {
+    "revision": "lut6-c16384-20261001-01",
+    "turns": [
+     {
+      "newConversation": true,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 340,
+      "reusedTokens": 0,
+      "firstTokenSeconds": 3.279
+     },
+     {
+      "newConversation": true,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 340,
+      "reusedTokens": 317,
+      "firstTokenSeconds": 0.19
+     },
+     {
+      "newConversation": false,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 380,
+      "reusedTokens": 364,
+      "firstTokenSeconds": 0.12
+     },
+     {
+      "newConversation": true,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 342,
+      "reusedTokens": 0,
+      "firstTokenSeconds": 1.47
+     },
+     {
+      "newConversation": true,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 342,
+      "reusedTokens": 319,
+      "firstTokenSeconds": 0.185
+     },
+     {
+      "newConversation": true,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 334,
+      "reusedTokens": 317,
+      "firstTokenSeconds": 0.144
+     }
+    ]
+   },
+   "phone-accept-prefix-full-20261005-04": {
+    "revision": "lut6-c16384-20261001-01",
+    "turns": [
+     {
+      "newConversation": true,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 340,
+      "reusedTokens": 0,
+      "firstTokenSeconds": 19.776
+     },
+     {
+      "newConversation": true,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 340,
+      "reusedTokens": 317,
+      "firstTokenSeconds": 0.189
+     },
+     {
+      "newConversation": false,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 381,
+      "reusedTokens": 365,
+      "firstTokenSeconds": 0.132
+     },
+     {
+      "newConversation": true,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 342,
+      "reusedTokens": 0,
+      "firstTokenSeconds": 1.32
+     },
+     {
+      "newConversation": true,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 342,
+      "reusedTokens": 319,
+      "firstTokenSeconds": 0.192
+     },
+     {
+      "newConversation": true,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 334,
+      "reusedTokens": 317,
+      "firstTokenSeconds": 0.135
+     }
+    ]
+   },
+   "phone-accept-prefix-full-20261005-05": {
+    "revision": "lut6-c16384-20261001-01",
+    "turns": [
+     {
+      "newConversation": true,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 340,
+      "reusedTokens": 317,
+      "firstTokenSeconds": 129.33
+     },
+     {
+      "newConversation": true,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 340,
+      "reusedTokens": 317,
+      "firstTokenSeconds": 0.185
+     },
+     {
+      "newConversation": false,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 381,
+      "reusedTokens": 365,
+      "firstTokenSeconds": 0.117
+     },
+     {
+      "newConversation": true,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 342,
+      "reusedTokens": 319,
+      "firstTokenSeconds": 0.189
+     },
+     {
+      "newConversation": true,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 342,
+      "reusedTokens": 319,
+      "firstTokenSeconds": 0.197
+     },
+     {
+      "newConversation": true,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 334,
+      "reusedTokens": 317,
+      "firstTokenSeconds": 0.128
+     }
+    ]
+   },
+   "phone-accept-prefix-balanced-20261005-01": {
+    "revision": "lut6-c4096-20261001-01",
+    "turns": [
+     {
+      "newConversation": true,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 340,
+      "reusedTokens": 0,
+      "firstTokenSeconds": 3.995
+     },
+     {
+      "newConversation": true,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 340,
+      "reusedTokens": 317,
+      "firstTokenSeconds": 0.153
+     },
+     {
+      "newConversation": false,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 380,
+      "reusedTokens": 364,
+      "firstTokenSeconds": 0.09
+     },
+     {
+      "newConversation": true,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 342,
+      "reusedTokens": 0,
+      "firstTokenSeconds": 1.023
+     },
+     {
+      "newConversation": true,
+      "thinking": true,
+      "state": "complete",
+      "inputTokens": 342,
+      "reusedTokens": 319,
+      "firstTokenSeconds": 0.142
+     },
+     {
+      "newConversation": true,
+      "thinking": false,
+      "state": "complete",
+      "inputTokens": 334,
+      "reusedTokens": 317,
+      "firstTokenSeconds": 0.107
+     }
+    ]
+   }
+  }
+ },
+ "stopKeepsKV": {
+  "procedure": "a Chinese conversation about the Journey to the West: a reply, a reply stopped a few seconds into its text, a continuation ('go on from there in two or three sentences'), another stopped reply, another continuation; kept conversation; the state 'stopped' is the stop itself",
+  "revision": "lut6-c16384-20261001-01",
+  "turns": [
+   {
+    "newConversation": true,
+    "thinking": false,
+    "state": "complete",
+    "inputTokens": 34,
+    "reusedTokens": 0,
+    "firstTokenSeconds": 2.423
+   },
+   {
+    "newConversation": false,
+    "thinking": false,
+    "state": "stopped",
+    "inputTokens": null,
+    "reusedTokens": null,
+    "firstTokenSeconds": null
+   },
+   {
+    "newConversation": false,
+    "thinking": false,
+    "state": "complete",
+    "inputTokens": 1018,
+    "reusedTokens": 996,
+    "firstTokenSeconds": 1.174
+   },
+   {
+    "newConversation": false,
+    "thinking": false,
+    "state": "stopped",
+    "inputTokens": null,
+    "reusedTokens": null,
+    "firstTokenSeconds": null
+   },
+   {
+    "newConversation": false,
+    "thinking": false,
+    "state": "complete",
+    "inputTokens": 1214,
+    "reusedTokens": 1192,
+    "firstTokenSeconds": 1.203
+   }
+  ],
+  "source": "phone-stop-keeps-kv-kept-full-20261005-01"
+ }
+}

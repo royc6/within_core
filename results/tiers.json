@@ -1,0 +1,718 @@
+{
+ "claims": [
+  "Four packages of the same model are published, two sets of weights at two KV capacities each; the engine reads all four from one catalog (catalogVersion 2) and a v1 manifest still reads as the full tier.",
+  "Lite 4K (3.18 GB) decodes at 29.2 tokens/s with a 3.25 GB peak footprint and prefills 1,024 tokens at 1,760 tokens/s; Lite 32K (same weights, 32,000-token capacity) decodes at 13.5 tokens/s in 4.91 GB and prefills at 871 tokens/s; Full (10.51 GB, 16,384, 64-wide prefill) at 16.9 tokens/s in 5.71 GB and 1,135 tokens/s prefill; Balanced (Full's weights at 4,096) at 22.4 tokens/s in 5.02 GB and 1,705 tokens/s.",
+  "All four runs were valid under the model-card procedure: five runs each, every run started nominal; one Full run ended in the fair state, with no paced interval in any run."
+ ],
+ "procedure": {
+  "name": "model-card procedure (perf-procedure-v2)",
+  "prompt": "a fixed 1,024-token prompt (a task sentence and an excerpt of this report), rendered with the checkpoint's chat template, no system prompt, thinking off; the prompt's token IDs hash to 3e94c52e5192b335c35cb23f19a46846bcc8bfeb072cc3d2ce70ab7f208d7172",
+  "sampling": {
+   "temperature": 0.7,
+   "topK": 64,
+   "topP": 0.95
+  },
+  "warmups": {
+   "count": 3,
+   "tokens": 64
+  },
+  "runs": {
+   "count": 5,
+   "tokens": 256
+  },
+  "prefillTokensPerSecond": "1,024 / seconds from the request to the prompt's logits (the chat template's rendering and the first decode step excluded)",
+  "decodeTokensPerSecond": "255 / seconds from the first to the 256th token; reported value = median of the five runs",
+  "firstTokenSeconds": "request start to the first sampled token, after warm-up (model loaded); median of the five runs",
+  "memoryMB": "largest phys_footprint seen in the engine's events over the five runs, in MB (10^6)",
+  "thermal": "each run starts in the nominal state; a run is throttled when an interval reaches the engine's 110 ms pacing",
+  "validity": "at least three unthrottled runs, no Low Power Mode, prompt exactly 1,024 tokens, no KV reuse (every run is a new conversation)",
+  "comparedWith": "Google's Gemma 4 model card rows for the iPhone 17 Pro (1,024 prompt tokens, 256 generated, context 2,048): CPU 159 / 9.7 tokens/s, 6.5 s, 961 MB; GPU 1,189 / 25.1 tokens/s, 0.9 s, 3,380 MB. Different device generation, runtime and context capacity; not reproduced here"
+ },
+ "conditions": {
+  "device": {
+   "model": "iPhone 18 Pro",
+   "identifier": "iPhone19,2",
+   "os": "iOS 27.2"
+  },
+  "build": "Release, the lab build of the app with the increased-memory-limit entitlement, wired, Low Power Mode off",
+  "date": "October 2026",
+  "engine": "within_core 1.1.0 (Core/ at the reviewed commit)"
+ },
+ "packages": [
+  {
+   "tier": "full",
+   "name": "Full",
+   "revision": "lut6-c16384-p64-20261008-01",
+   "contextLimit": 16384,
+   "weights": "Gemma 4 E4B-it BF16, quantized by us (6-bit palettes, FP16 embedding tables)",
+   "prefillWidth": 64,
+   "files": 35,
+   "bytes": 10508518154,
+   "chunkBytes": 3496960494,
+   "embeddingTableBytes": 6979321856,
+   "embeddingTableFormat": "FP16",
+   "modelCard": {
+    "device": "iPhone 18 Pro",
+    "backend": "ANE",
+    "contextLimit": 16384,
+    "prefillTokensPerSecond": 1135,
+    "decodeTokensPerSecond": 16.9,
+    "firstTokenSeconds": 0.9,
+    "modelSizeMB": 10509,
+    "memoryMB": 5712
+   },
+   "valid": true,
+   "throttledRuns": 1,
+   "maximumFirstTokenSeconds": 1.167,
+   "medians": {
+    "prefillTokensPerSecond": 1135,
+    "decodeTokensPerSecond": 16.88,
+    "firstTokenSeconds": 0.914,
+    "intervalMedianMs": 59.15,
+    "peakFootprintBytes": 5699080768,
+    "minimumAvailableBytes": 743370176
+   },
+   "peakFootprintBytesMax": 5708829416,
+   "minimumAvailableBytesMin": 733621528,
+   "runs": [
+    {
+     "prefillTokensPerSecond": 1136,
+     "decodeTokensPerSecond": 16.88,
+     "firstTokenSeconds": 0.914,
+     "intervalMedianMs": 59.09,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 5699080768,
+     "minimumAvailableBytes": 743370176,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 1138,
+     "decodeTokensPerSecond": 16.85,
+     "firstTokenSeconds": 0.913,
+     "intervalMedianMs": 59.15,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 5694706408,
+     "minimumAvailableBytes": 747744536,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 1132,
+     "decodeTokensPerSecond": 10.52,
+     "firstTokenSeconds": 0.917,
+     "intervalMedianMs": 107.16,
+     "throttledIntervals": 88,
+     "peakFootprintBytes": 5708829416,
+     "minimumAvailableBytes": 733621528,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "fair"
+    },
+    {
+     "prefillTokensPerSecond": 906,
+     "decodeTokensPerSecond": 16.93,
+     "firstTokenSeconds": 1.167,
+     "intervalMedianMs": 59.03,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 5700752104,
+     "minimumAvailableBytes": 741698840,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 1135,
+     "decodeTokensPerSecond": 16.9,
+     "firstTokenSeconds": 0.914,
+     "intervalMedianMs": 59.16,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 5698704200,
+     "minimumAvailableBytes": 743746744,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    }
+   ],
+   "source": "phone-perf-full-p64-20261009-02/phone-result.json (private run folder, October 2026; evaluated by perf_procedure_v2.py matrix)"
+  },
+  {
+   "tier": "balance",
+   "name": "Balanced",
+   "revision": "lut6-c4096-p64-20261009-01",
+   "contextLimit": 4096,
+   "weights": "same as full",
+   "prefillWidth": 64,
+   "files": 35,
+   "bytes": 10508518031,
+   "chunkBytes": 3496960394,
+   "embeddingTableBytes": 6979321856,
+   "embeddingTableFormat": "FP16",
+   "modelCard": {
+    "device": "iPhone 18 Pro",
+    "backend": "ANE",
+    "contextLimit": 4096,
+    "prefillTokensPerSecond": 1705,
+    "decodeTokensPerSecond": 22.4,
+    "firstTokenSeconds": 0.6,
+    "modelSizeMB": 10509,
+    "memoryMB": 5017
+   },
+   "valid": true,
+   "throttledRuns": 0,
+   "maximumFirstTokenSeconds": 0.616,
+   "medians": {
+    "prefillTokensPerSecond": 1705,
+    "decodeTokensPerSecond": 22.44,
+    "firstTokenSeconds": 0.613,
+    "intervalMedianMs": 44.52,
+    "peakFootprintBytes": 5008576944,
+    "minimumAvailableBytes": 1433874000
+   },
+   "peakFootprintBytesMax": 5014721064,
+   "minimumAvailableBytesMin": 1427729880,
+   "runs": [
+    {
+     "prefillTokensPerSecond": 1715,
+     "decodeTokensPerSecond": 22.2,
+     "firstTokenSeconds": 0.61,
+     "intervalMedianMs": 44.98,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 5008576944,
+     "minimumAvailableBytes": 1433874000,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 1704,
+     "decodeTokensPerSecond": 22.44,
+     "firstTokenSeconds": 0.613,
+     "intervalMedianMs": 44.52,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 5012115960,
+     "minimumAvailableBytes": 1430334984,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 1706,
+     "decodeTokensPerSecond": 22.46,
+     "firstTokenSeconds": 0.613,
+     "intervalMedianMs": 44.51,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 5014721064,
+     "minimumAvailableBytes": 1427729880,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 1705,
+     "decodeTokensPerSecond": 22.46,
+     "firstTokenSeconds": 0.613,
+     "intervalMedianMs": 44.5,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 4997845592,
+     "minimumAvailableBytes": 1444605352,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 1696,
+     "decodeTokensPerSecond": 22.23,
+     "firstTokenSeconds": 0.616,
+     "intervalMedianMs": 44.52,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 4995109488,
+     "minimumAvailableBytes": 1447341456,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    }
+   ],
+   "source": "phone-perf-balanced-p64-20261009-02/phone-result.json (private run folder, October 2026; evaluated by perf_procedure_v2.py matrix)"
+  },
+  {
+   "tier": "liteLong",
+   "name": "Lite 32K",
+   "revision": "qat-lut-srq-p128-c32000-20261002-01",
+   "contextLimit": 32000,
+   "weights": "Google's QAT mobile checkpoint (gemma-4-E4B-it-qat-mobile), its 4-bit decoder and 2-bit embedding codes written as palettes, activations clamped to Google's calibrated ranges",
+   "prefillWidth": 128,
+   "files": 37,
+   "bytes": 3180385831,
+   "chunkBytes": 2230646838,
+   "embeddingTableBytes": 917504000,
+   "embeddingTableFormat": "2-bit codes with F32 per-row scales (runtime schema 2)",
+   "modelCard": {
+    "device": "iPhone 18 Pro",
+    "backend": "ANE",
+    "contextLimit": 32000,
+    "prefillTokensPerSecond": 871,
+    "decodeTokensPerSecond": 13.5,
+    "firstTokenSeconds": 1.2,
+    "modelSizeMB": 3180,
+    "memoryMB": 4912
+   },
+   "valid": true,
+   "throttledRuns": 0,
+   "maximumFirstTokenSeconds": 1.255,
+   "medians": {
+    "prefillTokensPerSecond": 871,
+    "decodeTokensPerSecond": 13.53,
+    "firstTokenSeconds": 1.189,
+    "intervalMedianMs": 73.84,
+    "peakFootprintBytes": 4882271344,
+    "minimumAvailableBytes": 1560179600
+   },
+   "peakFootprintBytesMax": 4896099440,
+   "minimumAvailableBytesMin": 1546351504,
+   "runs": [
+    {
+     "prefillTokensPerSecond": 824,
+     "decodeTokensPerSecond": 13.54,
+     "firstTokenSeconds": 1.255,
+     "intervalMedianMs": 73.71,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 4879748208,
+     "minimumAvailableBytes": 1562702736,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 871,
+     "decodeTokensPerSecond": 13.53,
+     "firstTokenSeconds": 1.189,
+     "intervalMedianMs": 73.74,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 4879699056,
+     "minimumAvailableBytes": 1562751888,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 871,
+     "decodeTokensPerSecond": 13.53,
+     "firstTokenSeconds": 1.189,
+     "intervalMedianMs": 73.84,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 4882271344,
+     "minimumAvailableBytes": 1560179600,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 869,
+     "decodeTokensPerSecond": 13.52,
+     "firstTokenSeconds": 1.19,
+     "intervalMedianMs": 73.86,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 4883467376,
+     "minimumAvailableBytes": 1558983568,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 872,
+     "decodeTokensPerSecond": 13.53,
+     "firstTokenSeconds": 1.187,
+     "intervalMedianMs": 73.84,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 4896099440,
+     "minimumAvailableBytes": 1546351504,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    }
+   ],
+   "source": "phone-perf-lite32k-20261008-02/phone-result.json (private run folder, October 2026; evaluated by perf_procedure_v2.py matrix)"
+  },
+  {
+   "tier": "liteFast",
+   "name": "Lite 4K",
+   "revision": "qat-lut-srq-p128-c4096-20261002-01",
+   "contextLimit": 4096,
+   "weights": "same as liteLong",
+   "prefillWidth": 128,
+   "files": 37,
+   "bytes": 3180385710,
+   "chunkBytes": 2230646740,
+   "embeddingTableBytes": 917504000,
+   "embeddingTableFormat": "2-bit codes with F32 per-row scales (runtime schema 2)",
+   "modelCard": {
+    "device": "iPhone 18 Pro",
+    "backend": "ANE",
+    "contextLimit": 4096,
+    "prefillTokensPerSecond": 1760,
+    "decodeTokensPerSecond": 29.2,
+    "firstTokenSeconds": 0.6,
+    "modelSizeMB": 3180,
+    "memoryMB": 3255
+   },
+   "valid": true,
+   "throttledRuns": 0,
+   "maximumFirstTokenSeconds": 0.64,
+   "medians": {
+    "prefillTokensPerSecond": 1760,
+    "decodeTokensPerSecond": 29.16,
+    "firstTokenSeconds": 0.594,
+    "intervalMedianMs": 34.34,
+    "peakFootprintBytes": 3246295840,
+    "minimumAvailableBytes": 3196155104
+   },
+   "peakFootprintBytesMax": 3252603680,
+   "minimumAvailableBytesMin": 3189847264,
+   "runs": [
+    {
+     "prefillTokensPerSecond": 1765,
+     "decodeTokensPerSecond": 29.2,
+     "firstTokenSeconds": 0.592,
+     "intervalMedianMs": 34.26,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 3236809504,
+     "minimumAvailableBytes": 3205641440,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 1759,
+     "decodeTokensPerSecond": 29.13,
+     "firstTokenSeconds": 0.595,
+     "intervalMedianMs": 34.36,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 3252603680,
+     "minimumAvailableBytes": 3189847264,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 1761,
+     "decodeTokensPerSecond": 29.16,
+     "firstTokenSeconds": 0.594,
+     "intervalMedianMs": 34.35,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 3235318560,
+     "minimumAvailableBytes": 3207132384,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 1634,
+     "decodeTokensPerSecond": 29.71,
+     "firstTokenSeconds": 0.64,
+     "intervalMedianMs": 33.52,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 3246295840,
+     "minimumAvailableBytes": 3196155104,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    },
+    {
+     "prefillTokensPerSecond": 1760,
+     "decodeTokensPerSecond": 29.16,
+     "firstTokenSeconds": 0.594,
+     "intervalMedianMs": 34.34,
+     "throttledIntervals": 0,
+     "peakFootprintBytes": 3252603680,
+     "minimumAvailableBytes": 3189847264,
+     "thermalStateAtStart": "nominal",
+     "thermalStateAfter": "nominal"
+    }
+   ],
+   "source": "phone-perf-lite4k-20261008-02/phone-result.json (private run folder, October 2026; evaluated by perf_procedure_v2.py matrix)"
+  }
+ ],
+ "compile": {
+  "note": "seconds the Neural Engine compiler spends on the eight chunks at the first load of a package (model.specialize events; content-keyed cache afterwards). The 64-wide lut6 chunks of the 1.1 Full and Balanced packages take the longest; the lite chunks hold a 128-wide prefill function; after the app was uninstalled and reinstalled, the 16-wide Full relinked from a system cache that outlived the app container",
+  "rows": [
+   {
+    "tier": "full",
+    "revision": "lut6-c16384-p64-20261008-01",
+    "configuration": "Release",
+    "coldSeconds": 447.0,
+    "perChunkSeconds": [
+     106.6,
+     106.0,
+     104.7,
+     85.8,
+     13.2,
+     12.5,
+     12.8,
+     5.4
+    ],
+    "source": "phone-perf-full-p64-20261009-02 Diagnostics"
+   },
+   {
+    "tier": "balance",
+    "revision": "lut6-c4096-p64-20261009-01",
+    "configuration": "Release",
+    "coldSeconds": 457.7,
+    "perChunkSeconds": [
+     108.6,
+     105.6,
+     105.9,
+     87.3,
+     12.3,
+     13.2,
+     12.5,
+     5.2
+    ],
+    "source": "phone-perf-balanced-p64-20261009-02 Diagnostics"
+   },
+   {
+    "tier": "full",
+    "revision": "lut6-c16384-20261001-01 (16 wide)",
+    "configuration": "Release",
+    "coldSeconds": 146.7,
+    "perChunkSeconds": [
+     22.7,
+     26.4,
+     24.5,
+     19.1,
+     16.6,
+     20.5,
+     13.9,
+     3.6
+    ],
+    "source": "phone-perf-full-20261008-01 Diagnostics"
+   },
+   {
+    "tier": "full",
+    "revision": "lut6-c16384-20261001-01 (16 wide)",
+    "configuration": "Debug",
+    "coldSeconds": 125.9,
+    "perChunkSeconds": [
+     21.6,
+     19.9,
+     19.0,
+     17.4,
+     12.4,
+     13.0,
+     14.5,
+     8.2
+    ],
+    "afterReinstallSeconds": 16.8,
+    "source": "phone-accept-prefix-full-20261005-05 Diagnostics"
+   },
+   {
+    "tier": "balance",
+    "revision": "lut6-c4096-20261001-01 (16 wide)",
+    "configuration": "Release",
+    "coldSeconds": 186.3,
+    "perChunkSeconds": [
+     25.9,
+     33.7,
+     31.3,
+     23.6,
+     21.0,
+     21.8,
+     22.9,
+     6.1
+    ],
+    "source": "phone-perf-balanced-20261008-02 Diagnostics"
+   },
+   {
+    "tier": "balance",
+    "revision": "lut6-c4096-p128-20261008-01 (128 wide, not published)",
+    "configuration": "Release",
+    "coldSeconds": 193.8,
+    "perChunkSeconds": [
+     39.5,
+     39.4,
+     38.1,
+     33.2,
+     12.9,
+     12.6,
+     12.6,
+     5.5
+    ],
+    "source": "phone-perf-balanced-p128-20261009-01 Diagnostics"
+   },
+   {
+    "tier": "liteFast",
+    "configuration": "Release",
+    "coldSeconds": 269.3,
+    "perChunkSeconds": [
+     52.7,
+     51.7,
+     51.7,
+     43.7,
+     20.2,
+     20.3,
+     20.3,
+     8.5
+    ],
+    "source": "phone-perf-lite4k-20261005-01 Diagnostics"
+   },
+   {
+    "tier": "liteLong",
+    "configuration": "Debug",
+    "coldSeconds": 331.1,
+    "perChunkSeconds": [
+     71.9,
+     70.3,
+     71.4,
+     44.4,
+     21.3,
+     21.6,
+     21.6,
+     8.8
+    ],
+    "source": "phone-perf-lite32k-20261005-01 Diagnostics"
+   }
+  ],
+  "warmLoadSeconds": "about 1 s for all tiers (every chunk's specialize step 1-4 ms from the cache)"
+ },
+ "quality": {
+  "note": "the frozen set of Section 3.4 (200 prompts, 25,040 reference tokens, FP32 original as reference) run on the phone for the lite weights in October 2026; the full weights' figure is quality.json. The lite figure is the distance from a different, retrained model and is not a capability score",
+  "rows": [
+   {
+    "weights": "full / balance",
+    "nllPerTokenOverFP32": 0.0213,
+    "greedyAgreement": 0.951,
+    "source": "quality.json"
+   },
+   {
+    "weights": "liteFast",
+    "nllPerTokenOverFP32": 0.2075,
+    "greedyAgreement": 0.874,
+    "subsets": {
+     "en": 0.188,
+     "zh": 0.25,
+     "multi": 0.237,
+     "code": 0.104,
+     "long": 0.186
+    },
+    "referenceImplementation": {
+     "note": "Google's QAT reference in transformers with its full SRQ on the same set",
+     "nllPerTokenOverFP32": 0.215,
+     "greedyAgreement": 0.87
+    },
+    "withoutClamp": {
+     "nllPerTokenOverFP32": 0.563,
+     "greedyAgreement": 0.749
+    },
+    "source": "phone-quality-qat-lut-srq-p128-c4096-20261002-01-02 (archived)"
+   },
+   {
+    "weights": "liteLong",
+    "nllPerTokenOverFP32": 0.2075,
+    "greedyAgreement": 0.874,
+    "note": "bit-identical to liteFast item by item: same weights and graph, only the KV capacity differs and every prompt of the set is shorter than 4,096 tokens",
+    "source": "phone-quality-qat-lut-srq-p128-c32000-20261002-01 (archived)"
+   }
+  ]
+ },
+ "representation": {
+  "note": "how the lite weights' codes are written, measured on the 4,096-capacity lite export in October 2026 (Debug lab builds, 32-token prompt, 512 generated); the palettes were adopted",
+  "rows": [
+   {
+    "form": "INT4 container (decoder codes), 2-bit head in container form",
+    "result": "the head failed to compile for the ANE (ANECCompile failed) and ran on the GPU expanded to FP16, 1.35 GB more memory"
+   },
+   {
+    "form": "INT4 container (decoder codes), head as a 4-bit container",
+    "neuralFootprintGB": 4.97,
+    "neuralFootprintOverChunkBytes": 2.1,
+    "decodeTokensPerSecond": 26.9,
+    "peakFootprintGB": 5.3
+   },
+   {
+    "form": "palettes: 16-entry for the decoder, 4-entry for the head, per-channel scales from the checkpoint",
+    "neuralFootprintGB": 2.54,
+    "neuralFootprintOverChunkBytes": 1.14,
+    "decodeTokensPerSecond": 28.1,
+    "peakFootprintGB": 2.89,
+    "note": "bit-identical values to the container form"
+   },
+   {
+    "form": "full tier's 6-bit palettes (1.0)",
+    "neuralFootprintOverChunkBytes": 1.3
+   }
+  ],
+  "sources": "phone-qat-c4096-20261001-02, phone-qat-lut-c4096-20261002-01 (archived)"
+ },
+ "energy": {
+  "note": "one measurement of a 64-wide lite export (qat-lut-srq-p64-c4096-20261002-01), Release, wireless, unplugged, screen at 49%, Instruments Power Profiler recording only the app; the model-card procedure's five runs",
+  "generatedTokens": 1280,
+  "batteryDropPercent": 0.796,
+  "percentPer1000Tokens": 0.62,
+  "idleRatePercentPerHour": 2.96,
+  "medianDischargePercentPerHour": {
+   "loadAndWarmup": 56.0,
+   "prefill": 57.2,
+   "decode": 57.3,
+   "idle": 3.0
+  },
+  "source": "power-qat-lut-srq-p64-c4096-20261002-01 (archived)"
+ },
+ "liteConversion": {
+  "note": "release 1.1.0's public converter (within_core.qat and the lite paths of quantize, export and package) checked against the private exporter that made the published lite packages, on the real QAT checkpoint; the rebuild of the Lite 4K package was compared with the published one file by file",
+  "chunkCrossCheck": {
+   "method": "for each chunk, both exporters build the chunk from the checkpoint and author it with the published plan (context 4,096, prefill 128); every tensor of the two states is compared bit for bit, and the authored programs are printed and compared after the converter's random composite names are renumbered in order of first appearance (the method of A.3)",
+   "chunks": {
+    "0": {
+     "tensors": 272,
+     "tensorsEqual": 272,
+     "programSame": true
+    },
+    "1": {
+     "tensors": 272,
+     "tensorsEqual": 272,
+     "programSame": true
+    },
+    "2": {
+     "tensors": 272,
+     "tensorsEqual": 272,
+     "programSame": true
+    },
+    "3": {
+     "tensors": 272,
+     "tensorsEqual": 272,
+     "programSame": true
+    },
+    "4": {
+     "tensors": 212,
+     "tensorsEqual": 212,
+     "programSame": true
+    },
+    "5": {
+     "tensors": 212,
+     "tensorsEqual": 212,
+     "programSame": true
+    },
+    "6": {
+     "tensors": 212,
+     "tensorsEqual": 212,
+     "programSame": true
+    },
+    "7": {
+     "tensors": 65,
+     "tensorsEqual": 65,
+     "programSame": true
+    }
+   },
+   "result": "all eight chunks: every tensor equal bit for bit (272 in each of chunks 0-3, 212 in chunks 4-6, 65 in the head), programs identical after renumbering"
+  },
+  "packageRebuild": {
+   "revision": "qat-lut-srq-p128-c4096-20261002-01",
+   "rebuiltFiles": 37,
+   "rebuiltBytes": 3180386863,
+   "publishedBytes": 3180385710,
+   "byteIdentical": [
+    "LICENSE",
+    "NOTICE",
+    "chunk-contract.json",
+    "gemma-runtime.json",
+    "embeddings.int2",
+    "embeddings.scales.f32",
+    "perLayerEmbeddings.int2",
+    "perLayerEmbeddings.scales.f32",
+    "tokenizer/chat_template.jinja",
+    "tokenizer/tokenizer.json"
+   ],
+   "expectedToDiffer": {
+    "chunk-NN.aimodel/main.mlirb": "same program and weights (chunkCrossCheck); the serialized bytes differ by -9 to +8 bytes per chunk with the random names",
+    "chunk-NN.aimodel/main.hash and metadata.json": "follow the bytes",
+    "tokenizer/tokenizer_config.json": "same JSON, key order (taken from the QAT folder; the published copy came from the BF16 checkpoint)",
+    "tokenizer/config.json": "the QAT checkpoint's config.json (6,305 bytes, with the quantization block) against the BF16 one (5,145)",
+    "generation_config.json": "a transformers version string (209 against 208 bytes)"
+   },
+   "source": "public-lite-c4096-20261008-01 (private work folder, October 2026)"
+  }
+ }
+}

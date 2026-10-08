@@ -15,18 +15,37 @@ public struct Gemma4PrefillPlan: Sendable {
     }
     /// The calls in order.
     public let chunks: [Chunk]
+    /// A remainder of at least this many tokens runs as one padded `prefill_<prefillLength>` call
+    /// (the runtime pads it to the static width and writes back only the real tokens) instead of
+    /// one `prefill_1` call per token. A padded call costs about as much as a full one, which grows
+    /// with the width (16: 35 ms, 64: 67 ms on the ANE of an iPhone 18 Pro, results/prefill.json), against about 20 ms
+    /// per single-token call: width / 16 singles cost about the same, so fewer stay singles.
+    public static func paddedMinimum(prefillLength: Int) -> Int { max(2, prefillLength / 16) }
 
-    /// Plans `tokenCount` prompt tokens with `prefill_<prefillLength>` calls where they fit.
-    public init(tokenCount: Int, prefillLength: Int) throws {
-        guard tokenCount > 0, (2...128).contains(prefillLength) else {
+    /// Plans `tokenCount` prompt tokens with `prefill_<prefillLength>` calls where they fit. A padded
+    /// call is planned only while `availableSlots` (capacity left from the current position) holds
+    /// the full static width, as the graph writes that many cache slots.
+    public init(tokenCount: Int, prefillLength: Int, availableSlots: Int = .max) throws {
+        guard tokenCount > 0, (2...256).contains(prefillLength) else {
             throw Gemma4RuntimeError.contextExceeded
         }
         var result: [Chunk] = []
         let prefixEnd = tokenCount - 1
         var cursor = 0
         while cursor < prefixEnd {
-            let length = prefixEnd - cursor >= prefillLength ? prefillLength : 1
-            result.append(Chunk(tokens: cursor..<cursor + length, function: "prefill_\(length)", returnsLogits: false))
+            let remaining = prefixEnd - cursor
+            let length: Int
+            let function: String
+            if remaining >= prefillLength {
+                (length, function) = (prefillLength, "prefill_\(prefillLength)")
+            } else if remaining >= Self.paddedMinimum(prefillLength: prefillLength),
+                cursor + prefillLength <= availableSlots
+            {
+                (length, function) = (remaining, "prefill_\(prefillLength)")
+            } else {
+                (length, function) = (1, "prefill_1")
+            }
+            result.append(Chunk(tokens: cursor..<cursor + length, function: function, returnsLogits: false))
             cursor += length
         }
         result.append(Chunk(tokens: prefixEnd..<tokenCount, function: "step_1", returnsLogits: true))

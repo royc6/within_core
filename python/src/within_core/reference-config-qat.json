@@ -1,0 +1,168 @@
+{
+  "source": "google/gemma-4-E4B-it-qat-mobile-transformers",
+  "revision": "8e3ac78f1a4a97c19f5f194ab362a2206f71d961",
+  "transformers_reference": "5.12.1",
+  "files": {
+    "chat_template.jinja": {
+      "bytes": 18569,
+      "sha256": "0a2c8073c878ab1da004bee933a998606537bbb62016310352c7285c3f01c5b5"
+    },
+    "config.json": {
+      "bytes": 6305,
+      "sha256": "c4847fd621d80f160945b62f4a2d9413fc82b81f17955b49ae32ea9feb00c5c6"
+    },
+    "generation_config.json": {
+      "bytes": 209,
+      "sha256": "fb53f4c64e58896a63472e8eb304397db4a39453e1da0f5d57625ec5a8c1050e"
+    },
+    "model.safetensors": {
+      "bytes": 3525094516,
+      "sha256": "391946da2e0bec22288e9fe50a4d31d2401c9570ba3baaf0ba43d644dadeb1d4"
+    },
+    "tokenizer.json": {
+      "bytes": 32169626,
+      "sha256": "cc8d3a0ce36466ccc1278bf987df5f71db1719b9ca6b4118264f45cb627bfe0f"
+    },
+    "tokenizer_config.json": {
+      "bytes": 3082,
+      "sha256": "e1362ea24e613159d88c857b109c03d0f4e9e5134d3f6dbdc46a2a45caa8becf"
+    }
+  },
+  "quantization_config": {
+    "module_quant_configs": {
+      "^lm_head$": {
+        "num_bits": 2
+      },
+      "audio_tower(?!.*lconv1d\\.linear_start)": {
+        "num_bits": 2
+      },
+      "audio_tower\\.layers\\.\\d+\\.lconv1d\\.linear_start\\.": {
+        "num_bits": 4
+      },
+      "language_model\\.embed_tokens$": {
+        "num_bits": 2
+      },
+      "language_model\\.embed_tokens_per_layer$": {
+        "num_bits": 2
+      },
+      "language_model\\.layers\\.\\d+\\.mlp\\.": {
+        "num_bits": 4
+      },
+      "language_model\\.layers\\.\\d+\\.per_layer_input_gate$": {
+        "num_bits": 8
+      },
+      "language_model\\.layers\\.\\d+\\.per_layer_projection$": {
+        "num_bits": 8
+      },
+      "language_model\\.layers\\.\\d+\\.self_attn\\.": {
+        "num_bits": 4
+      },
+      "vision_tower": {
+        "num_bits": 8
+      }
+    },
+    "modules_to_not_convert": [
+      "model.vision_tower.patch_embedder",
+      "model.audio_tower.subsample_conv_projection",
+      "model.audio_tower.output_proj",
+      "relative_k_proj",
+      "model.embed_audio",
+      "model.embed_vision",
+      "per_layer_model_projection"
+    ],
+    "num_bits": 4,
+    "quant_method": "gemma",
+    "quantize_embeddings": true
+  },
+  "text_config": {
+    "attention_bias": false,
+    "attention_dropout": 0.0,
+    "attention_k_eq_v": false,
+    "bos_token_id": 2,
+    "dtype": "bfloat16",
+    "enable_moe_block": false,
+    "eos_token_id": 1,
+    "final_logit_softcapping": 30.0,
+    "global_head_dim": 512,
+    "head_dim": 256,
+    "hidden_activation": "gelu_pytorch_tanh",
+    "hidden_size": 2560,
+    "hidden_size_per_layer_input": 256,
+    "initializer_range": 0.02,
+    "intermediate_size": 10240,
+    "layer_types": [
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention"
+    ],
+    "max_position_embeddings": 131072,
+    "model_type": "gemma4_text",
+    "moe_intermediate_size": null,
+    "num_attention_heads": 8,
+    "num_experts": null,
+    "num_global_key_value_heads": null,
+    "num_hidden_layers": 42,
+    "num_key_value_heads": 2,
+    "num_kv_shared_layers": 18,
+    "pad_token_id": 0,
+    "rms_norm_eps": 1e-06,
+    "rope_parameters": {
+      "full_attention": {
+        "partial_rotary_factor": 0.25,
+        "rope_theta": 1000000.0,
+        "rope_type": "proportional"
+      },
+      "sliding_attention": {
+        "rope_theta": 10000.0,
+        "rope_type": "default"
+      }
+    },
+    "sliding_window": 512,
+    "tie_word_embeddings": false,
+    "top_k_experts": null,
+    "use_bidirectional_attention": null,
+    "use_cache": true,
+    "use_double_wide_mlp": false,
+    "vocab_size": 262144,
+    "vocab_size_per_layer_input": 262144
+  }
+}

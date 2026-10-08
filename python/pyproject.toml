@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "within-core"
-version = "1.0.0"
+version = "1.1.0"
 description = "Convert Gemma 4 E4B into chunked Core AI assets for the Apple Neural Engine"
 readme = "README.md"
 license = "Apache-2.0"

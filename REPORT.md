@@ -26,6 +26,12 @@ the FP32 original (limit 0.05). Performance on an iPhone 18 Pro with iOS 27.2: 1
 during an 11-minute run on battery, and about 9 tokens/s once the device warms and the engine paces itself.
 We also report the approaches that failed and what each failure rules out.
 
+Release 1.1 (Section 7) adds three packages of the same model — the same weights at a 4,096-token capacity, and
+Google's quantization-aware checkpoint written as palettes at 4,096 and 32,000 tokens (3.18 GB, 29.2 tokens/s in
+3.25 GB at 4,096) — a wider prefill (1,760 tokens/s on the lite weights), and KV caches that are continued when a
+conversation outgrows its window, across Thinking replies, across stops and, for the system prompt, across
+conversations from a file.
+
 ## Glossary
 
 | Term | Meaning here |
@@ -55,6 +61,9 @@ We also report the approaches that failed and what each failure rules out.
 | How fast? | 16.4 tokens/s decode; first token 0.62–0.64 s | KV capacity 16,384; 32-token prompt, 5 × 512 tokens, nominal thermal state at start | `performance.json` |
 | How much memory? | Peak 5.73 GB, at least 0.71 GB always available, of a 6.44 GB limit | 11-minute, 20-turn conversation on battery | `sustained.json`, `memory.json` |
 | Does it hold up thermally? | Fair after 62 s, never serious; paced to about 9 tokens/s | same run | `sustained.json` |
+| Release 1.1: the lighter packages? | Lite 4K (3.18 GB): 29.2 tokens/s decode, 1,760 tokens/s prefill, 0.6 s to the first token of 1,024, 3.25 GB peak; Lite 32K: 13.5 tokens/s and 871 tokens/s in 4.91 GB; Full 16.9 and Balanced 22.4 tokens/s under the same conditions | model-card procedure (1,024-token prompt, 256 generated), Release build, Section 7.1 | `tiers.json` |
+| Release 1.1: does the cache survive a full window? | The turn that overflows 32,000 tokens: 5.3 s instead of 35.8 s; kept facts 74/74 and 49/50 against 74/74 and 50/50, facts only the slid cache holds 44/44, health NLL +0.0145 (limit 0.02) | Section 7.3 | `kv_reuse.json` |
+| Release 1.1: new chats, Thinking, stops? | A 317-token system prompt read from disk: 0.19 s instead of 3.3 s to the first token; Thinking turns reuse 139–231 of 162–253 tokens; a stopped reply's cache is kept (996 of 1,018 reused) | Full package, Sections 7.4–7.6 | `kv_reuse.json` |
 
 ## 1 Problem and constraints
 
@@ -721,20 +730,264 @@ Sources: `negative.json`, `quality.json`.
 
 ## 6 Future work
 
-- Quantized lookup tables (INT8 or INT4 rows with per-row scales) to cut the download, judged on the same
-  quality set.
-- Wider prefill functions to raise prefill throughput.
+Release 1.1 (Section 7) did three items of the 1.0 list: lighter packages with 2-bit embedding tables, wider
+prefill functions, and caches reused across turns. What remains:
+
 - More context per byte: INT8 KV inputs, zero-copy input binding, or model state if a future compiler accepts it
   together with compressed weights.
 - A runtime placement check: compare each chunk's call time and post-load footprint with the package's baseline
   and recompile a chunk that left the ANE.
 - Close the instrument gaps: sample CPU time in the placement recording, explain the empty Core AI execution
   table, trace `prefill_16` and the product loop.
-- Measure energy with a power profiler.
-- Repeat the evaluation on other devices, and with a smaller-capacity package for devices with less memory.
-- Reuse caches across turns by longest common prefix, which needs care with the sliding-window rings.
+- Measure energy with a power profiler on every tier (one lite export was measured once, Section 7.2).
+- Repeat the evaluation on other devices.
 - Sweep chunk sizes; try calibrated rounding (GPTQ-style) for 4-bit MLP weights.
 - Apply the recipe to a second model.
+- Find the system-side cause of the degraded Neural Engine compiles (Section 7.2). The phone's analytics logs
+  hold no crash or jetsam of the compiler service or of `aned` around the failures (the jetsam events of those
+  days killed small daemons for their own limits), so the fallback is decided without a crash. The device log
+  of a normal load records the chain to look for: the compiler service's passes and `ANE compiler done ret(0)`,
+  `aned`'s `Compilation success`, the app's `loadModel` with a program handle, and the model's execution through
+  the MPSGraph delegate; two cold loads with the log running were clean, so a degraded load has not yet been
+  caught with it. A reboot is not what separates the failing from the clean loads: the phone had been up for
+  two days through both. Then confirm the engine's check and recompile on such a load.
+- Speculative decoding with Gemma 4's multi-token-prediction drafter (a separate checkpoint), once its acceptance
+  rate has been measured on the phone.
+
+## 7 Release 1.1: four packages and reused caches
+
+Release 1.0 shipped one package and an engine that prefilled a conversation again whenever its cache could not be
+continued. Release 1.1 adds three packages of the same model, a wider prefill, and four ways of keeping the KV
+caches across turns. Everything in this section was measured on the same iPhone 18 Pro with iOS 27.2 in October
+2026; the result files are `tiers.json`, `prefill.json` and `kv_reuse.json`. The engine's API is unchanged except
+for additions: `Gemma4Engine(folder:requireE4B:prefixStore:events:)`, new defaulted fields of `Options`, and
+`ModelCatalog`.
+
+### 7.1 Packages and tiers
+
+The engine reads a catalog of one package per tier with a default (`catalogVersion` 2); a 1.0 manifest still
+reads as the full tier. Two sets of weights at two KV capacities each:
+
+| Tier | Revision | Weights | Capacity | Download | Chunks | Embedding tables |
+| --- | --- | --- | --- | --- | --- | --- |
+| Full | `lut6-c16384-p64-20261008-01` | Section 2.5 (6-bit palettes, FP16 tables), 64-wide prefill | 16,384 | 10.51 GB | 3.50 GB | 6.98 GB FP16 |
+| Balanced | `lut6-c4096-p64-20261009-01` | same | 4,096 | 10.51 GB | 3.50 GB | same |
+| Lite 32K | `qat-lut-srq-p128-c32000-20261002-01` | Google's QAT checkpoint (below) | 32,000 | 3.18 GB | 2.23 GB | 0.92 GB, 2-bit |
+| Lite 4K | `qat-lut-srq-p128-c4096-20261002-01` | same | 4,096 | 3.18 GB | 2.23 GB | same |
+
+The lite weights are Google's quantization-aware checkpoint for mobile (`gemma-4-E4B-it-qat-mobile-transformers`): its 4-bit
+decoder codes and 2-bit embedding codes are written as palettes with Google's per-channel scales, so the numbers
+are Google's and the ANE keeps the chunks resident at 1.14 times their bytes (an INT4 container of the same codes
+took 2.1 times and the 2-bit head failed to compile). Google's checkpoint also calibrates an 8-bit range for every
+projection's input and output; the lite graphs clamp to those ranges without rounding, which brings the loss on
+the frozen set from +0.563 to +0.2075 nats/token, level with Google's reference implementation with its full
+rounding (+0.215) on the same 200 prompts. The lite figure is the distance from a different, retrained model, not
+a capability score; Section 3.4's +0.0213 remains the figure for the full weights. The two lite packages are
+bit-identical on the set, since only the capacity differs and every prompt is shorter than 4,096 tokens. The
+engine reads the 2-bit tables (runtime configuration schema 2: `int2` codes with F32 per-row scales, decoded as
+transformers' `QuantizedEmbedding` does and rounded once to FP16).
+
+Model-card procedure (Google's conditions: a fixed 1,024-token prompt, 256 generated tokens, three warm-ups,
+five runs each started in the nominal thermal state; Release build, wired; medians of five; memory is the largest
+footprint seen):
+
+| Tier | Prefill | Decode | First token | Memory | Minimum available |
+| --- | --- | --- | --- | --- | --- |
+| Full (16,384) | 1,135 tokens/s | 16.9 tokens/s | 0.9 s | 5.71 GB | 0.73 GB |
+| Balanced (4,096) | 1,705 tokens/s | 22.4 tokens/s | 0.6 s | 5.02 GB | 1.43 GB |
+| Lite 32K (32,000) | 871 tokens/s | 13.5 tokens/s | 1.2 s | 4.91 GB | 1.55 GB |
+| Lite 4K (4,096) | 1,760 tokens/s | 29.2 tokens/s | 0.6 s | 3.25 GB | 3.19 GB |
+| LiteRT-LM GPU, iPhone 17 Pro (2,048) | 1,189 tokens/s | 25.1 tokens/s | 0.9 s | 3.38 GB | — |
+
+![The four packages under the model-card procedure](docs/figures/tiers.svg)
+
+All four runs are valid under the procedure (no paced interval in any run; one Full run ended in the fair
+state). The 1.0 figures of Section 3.5 (16.4 tokens/s, 0.62 s) are the 32-token procedure and
+are not comparable with this table. Lite 4K is ahead of the published GPU figure in prefill, decode and the first
+token, in less memory, on a newer phone at twice the capacity. Lite 32K pays for its capacity in every step:
+each chunk's global-attention layers read the whole 32,000-slot cache, about 5.5 ms per chunk, and a 128-wide
+prefill call takes 136 ms against 67 ms at 4,096.
+The first load compiles the eight chunks for the ANE: 448 s for Full and 459 s for Balanced (their 64-wide prefill
+functions; the 16-wide packages took 147 and 186 s, Balanced's 128-wide export 194 s), 269 s for Lite 4K and 331 s
+for Lite 32K; later loads take about a second. A 64-wide lite export measured once
+with a power profiler used about 0.62% of the battery per 1,000 generated tokens (decode at 57%/h, the idle rate
+subtracted). Source: `tiers.json`.
+
+### 7.2 Prefill
+
+Three changes. A prompt's remainder that does not fill a prefill call used to run one token per call; it now runs
+as one padded call (copies of the last token, hidden by the causal masks, only the real tokens' K/V written back)
+when it has at least `width / 16` tokens. With a 64-wide package the 1,024-token prompt went from 448 to
+910 tokens/s and the first token from 2.3 to 1.13 s. Second, the prefill width is an export option up to 256. On
+the lite weights the four widths give 407 / 910 / 990 / 1,003 tokens/s and 2.5 / 1.13 / 1.04 / 1.03 s to the
+first token: the curve is flat from 128 on, which is the lite packages' width; 256 adds 1% and compiles longer.
+Full and Balanced, 16 wide until this release (426 and 570 tokens/s once the host's inputs were copied in one
+run, below), are exported 64 wide: 1,135 and 1,705 tokens/s, first token 0.9 and 0.6 s, decode and memory
+unchanged (16.9 and 22.4 tokens/s, 5.71 and 5.02 GB). 128 was tried on both: Balanced reached 1,898 tokens/s and
+0.55 s at 5.87 GB with 0.58 GB of memory left, 0.85 GB for 11%; Full's first prefill call reached a 6.27 GB
+footprint with 176 MB available and the engine's low-memory release cancelled the generation. Lite 32K at 64
+(788 tokens/s, 1.31 s, 4.48 GB) keeps its 128-wide export. The widths tried, under the model-card procedure
+(prefill, first token, decode, peak footprint, least memory available; `widthByTier` in `prefill.json`):
+
+| Tier | 16 wide | 64 wide | 128 wide |
+| --- | --- | --- | --- |
+| Full (16,384) | 426 tokens/s, 2.4 s, 16.9, 5.75 GB, 0.70 GB | **1,135, 0.9 s, 16.9, 5.71 GB, 0.73 GB** | did not fit (above) |
+| Balanced (4,096) | 570, 1.8 s, 22.4, 5.13 GB, 1.36 GB | **1,705, 0.6 s, 22.4, 5.02 GB, 1.43 GB** | 1,898, 0.55 s, 22.5, 5.87 GB, 0.58 GB |
+| Lite 32K (32,000) | — | 788, 1.31 s, 13.4, 4.48 GB, 1.96 GB | **871, 1.19 s, 13.5, 4.91 GB, 1.55 GB** |
+| Lite 4K (4,096) | 407 (width curve above) | 910 (width curve above) | **1,760, 0.59 s, 29.2, 3.25 GB, 3.19 GB** |
+
+![Prefill width: the lite width curve and the widths tried per tier](docs/figures/prefill-width.svg)
+
+Three of the seven first loads behind these figures compiled one chunk degraded: it specialized in a fraction of its usual time, its functions prepared in 80 to
+1,000 ms instead of about 12, every step ran it 3 to 20 times slower than its siblings, and the content-keyed
+cache kept the result (`widthByTier` in `prefill.json`); each was measured again after the cache was purged.
+What a degraded compile is, from the ten cold loads of these measurements (72 chunk compiles, 7 degraded,
+in 5 loads): the chunk's plan does not run on the Neural Engine. Its steps take 3 to 130 times a sibling's
+(24 ms against 8 for a Full chunk; 214 and 325 ms against 4 and 2.5 for a lite chunk and its head), its
+functions prepare in 70 to 3,600 ms instead of 6 to 20, two lite chunks on the CPU or GPU added 1.3 GB to the
+footprint, and the specialization often but not always finished in a fraction of its usual time (2 to 20 s
+instead of 22 to 136; twice it took the usual time). The compiles were not short of memory (at least 5.5 GB
+available to the process, no memory warning in the window), the phone started nominal, the same bytes compiled
+normally when loaded again minutes later, and the degraded chunk was the first of a load as often as the last.
+Failures cluster: in one load chunks 6 and 7 and a recompile of chunk 7 seven seconds later all came out
+degraded; in another chunks 0 and 1. At a 10% rate per chunk, three failures in twenty seconds point to a
+passing state of the system's compiler service rather than to the chunk or to chance. The public API offers no
+way to forbid the fallback (`allowedComputeUnitKinds` is read-only) or to ask where a function runs, so the
+engine judges by time. Over the third to fifth decode steps after a load (`Gemma4CompileCheck`, the per-chunk
+medians; the first steps are cold for the chunks the prefill did not use, 20 to 25 ms, and the step after a
+recompile is cold again) a layer chunk over 2.5 times the layer chunks' median, or the head over 2 times it, has
+its cache entries dropped and is compiled again; the steps after that are judged once more, and a chunk still
+degraded has its entries dropped again, so the next load compiles it afresh. The check writes
+`model.compile.check` and `model.compile.unresolved` events. On the phone the first version recompiled a cold
+chunk (22 s; the reply went on), and the second met the two-chunk failure above: it named the head, whose
+recompile inside the same window was degraded again, which is why a second judgement and a second deletion
+follow. Root cause outside the process: see Section 6.
+
+Third, the host's inputs. The engine built every input array with `NDArray(scalars:)`, which copies one value at a
+time, about 20 ns each on this phone: a 4,096-token call's two masks, its embeddings and the per-chunk identity
+slices cost the host 56 ms of a 124 ms call, and a 32,000-token call's masks 150 ms of 286. 1.1 allocates each
+array and copies it in one run, gathers the next call's embeddings while the current call runs on the Neural
+Engine, and builds the masks as runs of zeros rather than value by value. The host's part of a 128-token call
+fell to 1.2 ms at 4,096 and 3.4 ms at 32,000; the lite packages prefill the 1,024-token prompt at 1,760 and
+871 tokens/s and reach the first token in 0.59 and 1.19 s. Full and Balanced, whose 16-wide calls were a quarter
+host work, went from 299 to 426 and from 411 to 570 tokens/s, their first tokens from 3.4 to 2.4 s and from 2.5
+to 1.8 s, before the wider export. (The width curve above was measured before this change; the host's share was
+the same at every width.)
+
+Where a call's time goes (medians over the model-card runs; the host's input preparation is the token and
+per-layer embeddings looked up and decoded, the rotary tables and the masks for the call's positions; dispatch is
+the remainder after the chunks' predictions, the K/V copies and the logit readback):
+
+| Tier, call | Total | Host input | Neural Engine | K/V write | Dispatch and readback |
+| --- | --- | --- | --- | --- | --- |
+| Lite 4K, `prefill_128` | 67 ms | 0.7 ms | 60 ms | 6 ms | 0.5 ms |
+| Lite 32K, `prefill_128` | 136 ms | 2.7 ms | 125 ms | 7 ms | 0.7 ms |
+| Full, `prefill_64` | 52 ms | 0.8 ms | 47 ms | 3.1 ms | 0.4 ms |
+| Balanced, `prefill_64` | 34 ms | 0.4 ms | 31 ms | 3.1 ms | 0.2 ms |
+| Lite 4K, `step_1` | 33.8 ms | 0.1 ms | 32.4 ms | 0.2 ms | 1.2 ms |
+| Full, `step_1` | 58.5 ms | 0.1 ms | 57.0 ms | 0.2 ms | 1.2 ms |
+
+![Where one call's time goes, before and after the input copy and at the 1.1 widths](docs/figures/call-split.svg)
+
+Before the third change the same calls took 124 and 286 ms, 34 and 129 ms of it input preparation and 22 and 21 ms
+dispatch, and Full's 16-wide call 52 ms (`callSplitBefore` in `prefill.json`; the 16-wide calls after the change, 36
+and 27 ms, are `callSplitWidth16`). Now the Neural Engine has 89% of a 4,096 call and 92% of a 32,000 one, and
+prefills the 24 owner layers at about 2,140 tokens/s inside its calls (Balanced's 64-wide call 2,085, Full's 1,350
+against its 16,384-slot caches); what is left on the host is the K/V copy. At 32,000 the full-attention layers' reads
+of the whole cache add 22 ms a chunk. Decode is the Neural Engine's: 96% of a step. Against the published GPU figure
+(1,189 tokens/s, 25.1 tokens/s, 0.9 s to the first token of 1,024, on an iPhone 17 Pro at a 2,048-token capacity) the
+lite path at 4,096 is ahead on all three. Source: `prefill.json`.
+
+### 7.3 KV-SLIDE: the cache continues when the conversation outgrows it
+
+1.0 trimmed a conversation to half the window when it no longer fit and prefilled the rest again. 1.1 keeps a
+slot table for the full-attention caches (`Gemma4SlotTable`): writes go to the slots the table assigns, the
+global mask comes from the table, and evicting a position frees its slot. When a prompt needs room the engine
+evicts the oldest tokens after the head (bos and the system turn, found by rendering the same system prompt with
+one plain user turn) in blocks of 128, never from the latest turn, and only when the next call needs the room;
+a reply frees a block when every slot is held. Positions run to the model's 131,072; the ring mask of the
+sliding-attention layers hides positions the table no longer holds, so an evicted token is invisible to every
+layer. A cache whose live window the new prompt still contains is continued; otherwise the engine falls back to
+1.0's trim and clean prefill. `KVSlidePlan` is pure and tested; the runtime and engine parts are compiled into
+the chunks' calls.
+
+On the phone, the same 22-turn workload (each turn a document excerpt of about 1,900 tokens, 64 generated): on
+Lite 32K the turn that first exceeded 32,000 tokens went from 35.8 s (15,302 tokens prefilled again) to 5.3 s
+(about 2,100 fed, 29,863 reused), the cache holds 32,000 from then on, decode stays at 76.6 ms per token, and
+the run takes 232 s against 268 s with the same peak (4.89 GB). On Lite 4K every turn after the third slides,
+the first token stays at 0.7–2.5 s with decode at 36.3 ms, the position reaches ten times the slot count, and
+the peak is 3.27 GB; 1.0 prefilled the whole conversation every turn of this workload.
+
+Whether the model still answers from old K/V that was computed next to tokens since evicted was tested on the
+Mac with the engine's cache reproduced row by row in transformers: 10 scripted conversations (133K tokens),
+window 4,096, 24 question points at 1.5–4.4 times the window, 267 fact questions and 72 health questions. Facts
+that both arms keep: numbers 74/74 in both; words, judged among the planted candidates, 50/50 against 49/50.
+Facts only KV-SLIDE still holds: 44/44 against 2/44 (chance). Facts both have evicted: chance in both, so nothing
+returns through old K/V; 15 updated facts are answered with the new value in both. Health NLL is 0.0145 nats/token
+higher (limit 0.02): the parts are −0.009 from more context, +0.021 from the old K/V not being recomputed and
++0.002 from the gap of positions after the head; shifting the content 100,000 positions later changes nothing.
+The rule frozen before the run (at most 5 points of accuracy lost on kept facts) was missed by 0.4 points on the
+original word scoring, where the difference is the model ranking a bold marker first rather than a wrong value;
+we report it as missed. The engine switched from per-token to block eviction after this comparison, which only
+gives each call more old context; it was not rerun. Source: `kv_reuse.json`.
+
+### 7.4 Thinking replies continue the cache
+
+After a reply with Thinking on, the tokens the output filter hid (the thought channel and its markers) leave the
+cache: their full-attention slots are freed, their positions stay unused, and the answer keeps its K/V, so the
+next prompt, rendered without the thought, extends what is left. Cached tokens are named by their place among what
+the table holds, not by position. On the Mac (6 conversations, scripted thoughts of 578–1,068 tokens) the planted
+facts are answered 72/72 clean and 72/72 with the gap, health NLL +0.0034. On the Full package a 5-turn Thinking
+conversation reuses 139–231 of 162–253 input tokens from turn 2 on with 0.17–0.18 s to the first token; the same
+on Balanced, 65–157 of 88–179 and 0.13–0.15 s.
+
+### 7.5 PREFIX-KV: the system prompt's cache on disk
+
+The K/V of a prompt's head is written to `Caches/PrefixKV/<package>/<SHA-256 of the head's tokens>` the first
+time a clean start renders it (each cache's first min(K, slots) slots; the file is checked for size and finite
+values when read; two files are kept) and read back by later clean starts with the same head, which carries the
+instructions, the template and the Thinking setting. On the Full package a new conversation with a 317-token
+system prompt goes from 3.3 s to 0.19 s to the first token (model already loaded; 317 of 340 tokens reused in each
+of three runs), on Balanced from 4.0 s to 0.15 s; the file is written in about 10 ms and read in 9 ms. The app only enables it for the
+Full and Balanced tiers; nothing is computed ahead when instructions are saved.
+
+### 7.6 A stopped reply keeps the cache
+
+The runtime tells a stop found at one of its two checkpoints from a failure and no longer asks for a reset after
+it; the engine keeps the state when the runtime's position is the one it recorded and the hidden tokens can be
+hidden as a normal ending hides them. On the Full package the turn after a stopped reply reused 996 of 1,018 and
+1,192 of 1,214 tokens (first token 1.17–1.20 s) instead of prefilling the conversation again. A stop during
+prefill and every real error discard the cache as before.
+
+### 7.7 Options off by default
+
+Three further mechanisms are in the engine for the app's experiments and are off unless asked for. Summary turns
+(`ChatTurn.isSummaryRequest`): a user turn can be marked as the request for a summary of the conversation so far;
+its reply is written straight away without a thought channel, and afterwards the cache keeps the head, the most
+recent quarter of the window before the request and the summary turn, which later evictions pass over until the
+next summary releases it; a clean start of a conversation that holds a summary turn feeds the same tokens. The app
+tried it on the phone and found the model's summaries not good enough to rely on, so it stays off. Thinning
+(`Options.thinAtFreeSlots`): when a reply ends with few free slots, turns that end more than a quarter of the
+window before it are thinned in place without a model call, the user's turns of up to `longestKeptTurn` tokens
+staying and the assistant's replies and longer pastes leaving; the conversation renders the same way from then on.
+Recall (`Options.recall`): the turns the cache no longer holds are searched for the words of the new message
+(BM25, CJK by character pairs, long turns in pieces) and the best two pieces within about 700 tokens go in as a
+turn of their own for that reply only. All three have unit tests on the pure layer; none has a device result in
+this release, so none carries a number here.
+
+### 7.8 Reproducing the lite packages
+
+`python/` converts Google's QAT checkpoint as it converts the BF16 one (`within_core.qat`, A.5): the codes are read
+as stored and checked against the checkpoint's own quantization configuration, unpacked as Transformers'
+`gemma_quant` unpacks them (the tests compare the two bit for bit), and written into the chunks as palettes with the
+clamps of Section 7.1; the 2-bit tables are copied as stored with their scales. The port was checked against the
+private exporter that made the published packages on the real checkpoint: for all eight chunks every tensor of the
+built chunk is equal bit for bit (272 in each of chunks 0–3, 212 in chunks 4–6, 65 in the head) and the authored
+programs are identical once the converter's random composite names are renumbered (A.3). A rebuild of the Lite 4K package from the QAT checkpoint
+alone differs from the published one only in three small JSON files (`tokenizer_config.json`, `tokenizer/config.json`
+and `generation_config.json`), which the published packages took from the BF16 checkpoint; the tokenizer, the
+template, both tables, the contract and the runtime configuration are byte-identical, and the chunks are equivalent
+as above. The demo app still downloads the Full package.
 
 ## Appendix A Reproducibility
 
@@ -749,6 +1002,7 @@ Sources: `negative.json`, `quality.json`.
 | Swift packages (current pins) | `apple/coreai-models` at `df8119879f125ad1e2e4c6249c2cddded75c190a`; `huggingface/swift-transformers` 1.3.4 |
 | Converter (Python), as pinned by the exporter's requirements | torch 2.9.0, transformers 5.12.1, coreai-core 1.0.0b2, coreai-torch 0.4.2, coreai-models at the same commit, huggingface-hub 1.30.0 |
 | Checkpoint | `google/gemma-4-E4B-it` at revision `ee0ef6023621cff504d758262d4e04895a5af4a2`, read from a local copy |
+| Checkpoint of the lite packages (release 1.1) | `google/gemma-4-E4B-it-qat-mobile-transformers` at revision `8e3ac78f1a4a97c19f5f194ab362a2206f71d961`, read from a local copy |
 | Dates | Evidence recorded in September 2026; the shipped package exported in October 2026; external figures retrieved in October 2026 |
 
 ### A.2 Model package
@@ -757,6 +1011,16 @@ Revision `lut6-c16384-20261001-01` at https://huggingface.co/royc6/within-gemma-
 35 files, 10,508,518,095 bytes, contract `gemma4-chunked-hostkv-v1`, capacity 16,384, sliding cache 512,
 prefill width 16. The SHA-256 of every file is in the package's manifest; those of the eight `main.mlirb` files
 and the two tables are also in `results/package.json`.
+
+Release 1.1 adds five revisions of the same repository (tags of the same names). The catalog's Full and Balanced are
+`lut6-c16384-p64-20261008-01` (35 files, 10,508,518,154 bytes, capacity 16,384, prefill width 64) and
+`lut6-c4096-p64-20261009-01` (35 files, 10,508,518,031 bytes, capacity 4,096, width 64): the weights of
+`lut6-c16384-20261001-01` with a 64-wide prefill function. `lut6-c4096-20261001-01` (35 files, 10,508,517,962 bytes,
+capacity 4,096, width 16) is the Balanced package of the before figures. The lite revisions are
+`qat-lut-srq-p128-c32000-20261002-01` (37 files, 3,180,385,831 bytes, capacity 32,000, prefill width 128) and
+`qat-lut-srq-p128-c4096-20261002-01` (37 files, 3,180,385,710 bytes, capacity 4,096, width 128). Their composition is
+in `results/tiers.json`; the SHA-256 of every file is in each package's manifest. The lite revisions were converted
+from `google/gemma-4-E4B-it-qat-mobile-transformers` at revision `8e3ac78f1a4a97c19f5f194ab362a2206f71d961`.
 
 ### A.3 Package equivalence
 
@@ -786,19 +1050,25 @@ and the 11 other files are byte-identical. On the phone the shipped export decod
 
 Package export: one process per chunk, then a finalize step that writes `chunk-contract.json` and
 `gemma-runtime.json`; the FP16 tables are exported separately; the converter runs in release mode. The defaults of
-`within_core.convert` are the published configuration, so the commands in [`python/`](python/README.md) rebuild the
-shipped package from a local checkpoint (`CKPT`) in a work folder (`WORK`):
+`within_core.convert` are the 1.0 configuration (a 16-wide prefill); with `--prefill 64` the commands in
+[`python/`](python/README.md) rebuild the 1.1 Full package from a local checkpoint (`CKPT`) in a work folder
+(`WORK`):
 
 ```sh
 for i in 0 1 2 3 4 5 6 7; do
-  python -m within_core.convert chunk "$i" --checkpoint "$CKPT" --output "$WORK/export"
+  python -m within_core.convert chunk "$i" --checkpoint "$CKPT" --output "$WORK/export" --prefill 64
 done
-python -m within_core.convert finalize --output "$WORK/export"
+python -m within_core.convert finalize --output "$WORK/export" --prefill 64
 python -m within_core.convert tables --checkpoint "$CKPT" --output "$WORK/tables"
 python -m within_core.convert package --export "$WORK/export" --tables "$WORK/tables" \
-  --checkpoint "$CKPT" --output "$WORK/release" --revision lut6-c16384-20261001-01 \
-  --base-url https://huggingface.co/royc6/within-gemma-4-e4b/resolve/lut6-c16384-20261001-01/
+  --checkpoint "$CKPT" --output "$WORK/release" --revision lut6-c16384-p64-20261008-01 \
+  --base-url https://huggingface.co/royc6/within-gemma-4-e4b/resolve/lut6-c16384-p64-20261008-01/
 ```
+
+The lite packages (release 1.1) use the same commands with the QAT checkpoint as `CKPT`, `--context 4096` or
+`--context 32000` and `--prefill 128` on the `chunk` and `finalize` steps, and their revisions
+(`qat-lut-srq-p128-c4096-20261002-01`, `qat-lut-srq-p128-c32000-20261002-01`); `tables` then writes the 2-bit
+tables. `python -m within_core.convert catalog` writes the app's catalog of one package per tier.
 
 Engine: `swift build` and `swift test` in this repository build the runtime and run the contract, prefill-plan,
 mask, lookup and quality-score tests; the fixtures under `Tests/` are the shipped package's `gemma-runtime.json`
@@ -816,6 +1086,9 @@ and `chunk-contract.json`.
 | `results/memory.json` | Budget, components, peaks by scenario |
 | `results/sustained.json` | Workload, per-turn timings, thermal and memory results, pacing |
 | `results/negative.json` | Rejected approaches with their conditions |
+| `results/tiers.json` | Release 1.1: the four packages' composition, model-card results, compile times, lite quality, representation and energy |
+| `results/prefill.json` | Release 1.1: padded remainder, the prefill width curve, per-call times by tier |
+| `results/kv_reuse.json` | Release 1.1: KV-SLIDE fill tests and the Mac comparison, Thinking continuation, PREFIX-KV, stop keeps the cache |
 
 ## Appendix B References
 

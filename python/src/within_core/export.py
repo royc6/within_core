@@ -14,7 +14,9 @@ The plan: the 42 decoder layers in 7 chunks of 6, a balance between what the Neu
 compiler accepts per asset, memory, and per-call overhead; then the vocabulary head as an
 8th chunk of its own (together with the last layers it is too large to compile), split into
 16 row slices; host-held KV with a 16384-token context and 512-slot sliding-attention rings;
-prefill in blocks of 16 tokens.
+prefill in blocks of 16 tokens. The lite packages (release 1.1) use the same plan with a
+4096- or 32000-token context, prefill blocks of 128 tokens, and Google's QAT codes
+(:mod:`within_core.qat`) in place of our quantization.
 """
 
 import functools
@@ -28,24 +30,32 @@ import torch
 from coreai.authoring.asset import AIProgram
 from coreai_models.export.mlir_ops import register_custom_torch_lowering
 from coreai_torch import TorchConverter, get_decomp_table
-from torch import Tensor
+from torch import Tensor, nn
 from torch.export import ExportedProgram
+from torch.nn.utils.parametrize import is_parametrized
 from transformers import Gemma4TextConfig
 
 from within_core.checkpoint import LocalCheckpoint
 from within_core.chunks import ChunkLayout, DecoderBlock, HeadChunk, HeadLayout, LayerChunk, Layout
 from within_core.layers import PerLayerProjection, RMSNorm
+from within_core.qat import QATCheckpoint
 from within_core.quantize import (
+    LITE_WEIGHT_FORMAT,
     WEIGHT_FORMAT,
     quantize_head,
+    quantize_head_qat,
     quantize_projections,
+    quantize_projections_qat,
     require_compressed,
 )
 from within_core.tables import EMBEDDINGS, PER_LAYER_EMBEDDINGS
 
+Checkpoint = LocalCheckpoint | QATCheckpoint
+
 BOUNDARIES = (0, 6, 12, 18, 24, 30, 36, 42)
 HEAD_PARTS = 16
 PREFILL_LENGTH = 16
+MAX_PREFILL_LENGTH = 256
 CONTEXT = 16384
 CONTRACT = "gemma4-chunked-hostkv-v1"
 CHUNK_CONTRACT = "chunk-contract.json"
@@ -92,12 +102,20 @@ def plan(config: Gemma4TextConfig, context: int = CONTEXT) -> list[Layout]:
     return [*layers, head]
 
 
-def runtime_config(config: Gemma4TextConfig, context: int = CONTEXT) -> dict[str, object]:
+def weight_format(checkpoint: Checkpoint) -> str:
+    """Return the ``weightFormat`` of a package converted from ``checkpoint``."""
+    return LITE_WEIGHT_FORMAT if isinstance(checkpoint, QATCheckpoint) else WEIGHT_FORMAT
+
+
+def runtime_config(
+    config: Gemma4TextConfig, context: int = CONTEXT, prefill_length: int = PREFILL_LENGTH
+) -> dict[str, object]:
     """Return the contents of ``gemma-runtime.json``.
 
     It gives the host the model geometry, the RoPE parameters it computes cosines and sines
     from, the cache sizes, the prefill block length and the FP16 tables it reads
-    embeddings from.
+    embeddings from (:mod:`within_core.package` replaces the table entries for a lite
+    package, whose tables are 2-bit).
     """
     rope = config.rope_parameters
     return {
@@ -115,7 +133,7 @@ def runtime_config(config: Gemma4TextConfig, context: int = CONTEXT) -> dict[str
         "globalRotaryFraction": rope["full_attention"]["partial_rotary_factor"],
         "slidingWindow": config.sliding_window,
         "contextLimit": context,
-        "prefillLength": PREFILL_LENGTH,
+        "prefillLength": prefill_length,
         "embeddings": {
             "file": EMBEDDINGS,
             "format": "float16",
@@ -131,12 +149,15 @@ def runtime_config(config: Gemma4TextConfig, context: int = CONTEXT) -> dict[str
     }
 
 
-def build_layer_chunk(checkpoint: LocalCheckpoint, layout: ChunkLayout) -> LayerChunk:
+def build_layer_chunk(checkpoint: Checkpoint, layout: ChunkLayout) -> LayerChunk:
     """Build a compressed layer chunk, reading only its own layers from the checkpoint.
 
     Each layer is compressed as soon as it is built, so only one layer is dense at a time.
+    From a QAT checkpoint the projections take Google's codes and clamps, and the per-layer
+    model projection stays FP16 as Google left it.
     """
     config = checkpoint.config
+    lite = isinstance(checkpoint, QATCheckpoint)
     ple_dim = config.hidden_size_per_layer_input
     ple = PerLayerProjection(
         checkpoint.row_range(
@@ -148,23 +169,48 @@ def build_layer_chunk(checkpoint: LocalCheckpoint, layout: ChunkLayout) -> Layer
         projection_scale=config.hidden_size**-0.5,
         input_scale=2**-0.5,
     )
-    quantize_projections(ple)
+    if not lite:
+        quantize_projections(ple)
     blocks = []
     for index in range(layout.start, layout.end):
         block = DecoderBlock(checkpoint.layer(index))
-        quantize_projections(block)
+        if lite:
+            quantize_projections_qat(
+                block,
+                lambda module, i=index: checkpoint.linear(f"layers.{i}.{module}"),
+                lambda module, i=index: checkpoint.activation_scales(f"layers.{i}.{module}"),
+            )
+        else:
+            quantize_projections(block)
         blocks.append(block)
         gc.collect()
     return LayerChunk(layout, blocks, ple).eval()
 
 
-def build_head_chunk(checkpoint: LocalCheckpoint, layout: HeadLayout) -> HeadChunk:
-    """Build the head chunk; the tied head is read and compressed one row block at a time."""
+def build_head_chunk(checkpoint: Checkpoint, layout: HeadLayout) -> HeadChunk:
+    """Build the head chunk; the head is read and compressed one row block at a time.
+
+    The BF16 checkpoint's head is tied to the embedding and quantized here; the QAT
+    checkpoint ships its own 2-bit head, written as palettes.
+    """
     config = checkpoint.config
     norm = RMSNorm(checkpoint.tensor("norm.weight"), config.rms_norm_eps)
-    read_rows = functools.partial(checkpoint.row_range, "embed_tokens.weight")
-    parts = quantize_head(read_rows, config.vocab_size, config.hidden_size, layout.parts)
+    if isinstance(checkpoint, QATCheckpoint):
+        read_codes = functools.partial(checkpoint.linear, "lm_head")
+        parts = quantize_head_qat(read_codes, config.vocab_size, config.hidden_size, layout.parts)
+    else:
+        read_rows = functools.partial(checkpoint.row_range, "embed_tokens.weight")
+        parts = quantize_head(read_rows, config.vocab_size, config.hidden_size, layout.parts)
     return HeadChunk(layout, norm, parts, config.final_logit_softcapping).eval()
+
+
+def require_lite_compressed(chunk: LayerChunk | HeadChunk) -> None:
+    """Raise ``ValueError`` unless every projection but the per-layer model projection is
+    compressed."""
+    convs = [(n, c) for n, c in chunk.named_modules() if isinstance(c, nn.Conv2d)]
+    dense = [name for name, conv in convs if not is_parametrized(conv) and name != "ple.projection"]
+    if dense:
+        raise ValueError(f"Projections escaped compression: {dense}")
 
 
 def example_inputs(layout: Layout, length: int) -> tuple[Tensor, ...]:
@@ -273,25 +319,33 @@ def author(chunk: LayerChunk | HeadChunk, prefill_length: int = PREFILL_LENGTH) 
 
 
 def export_chunk(
-    checkpoint: LocalCheckpoint, index: int, output: Path, context: int = CONTEXT
+    checkpoint: Checkpoint,
+    index: int,
+    output: Path,
+    context: int = CONTEXT,
+    prefill_length: int = PREFILL_LENGTH,
 ) -> Path:
     """Export chunk ``index`` of the plan into ``output``.
 
     Writes ``chunk-<index>.aimodel`` and, once it is complete, the record
-    ``chunk-<index>.json`` holding the chunk's contract entry.
+    ``chunk-<index>.json`` holding the chunk's contract entry and the weight format.
 
     Args:
-        checkpoint: The verified checkpoint.
+        checkpoint: The verified checkpoint (BF16, or Google's QAT one for a lite package).
         index: Chunk index in the plan (``0`` to ``7``).
         output: Export folder, shared by all chunks of one export.
         context: Context limit.
+        prefill_length: Tokens per prefill call (2 to 256).
 
     Returns:
         The path of the asset.
 
     Raises:
         FileExistsError: If the chunk was already exported into ``output``.
+        ValueError: If ``prefill_length`` is out of range.
     """
+    if not 2 <= prefill_length <= MAX_PREFILL_LENGTH:
+        raise ValueError(f"prefill_length must be 2 to {MAX_PREFILL_LENGTH}")
     layout = plan(checkpoint.config, context)[index]
     asset, record = output / chunk_file(index), output / record_file(index)
     if asset.exists() or record.exists():
@@ -302,46 +356,60 @@ def export_chunk(
         chunk = build_head_chunk(checkpoint, layout)
     else:
         chunk = build_layer_chunk(checkpoint, layout)
-    require_compressed(chunk)
+    if isinstance(checkpoint, QATCheckpoint):
+        require_lite_compressed(chunk)
+    else:
+        require_compressed(chunk)
     gc.collect()
     logger.info("chunk %d: authoring", index)
-    authored = author(chunk)
+    authored = author(chunk, prefill_length)
     del chunk
     gc.collect()
     logger.info("chunk %d: saving %s", index, asset)
     authored.save_asset(asset)
-    _write_json(record, layout.contract(asset.name, PREFILL_LENGTH))
+    entry = layout.contract(asset.name, prefill_length)
+    _write_json(record, {"contract": entry, "weightFormat": weight_format(checkpoint)})
     return asset
 
 
-def finalize(output: Path, config: Gemma4TextConfig, context: int = CONTEXT) -> None:
+def finalize(
+    output: Path,
+    config: Gemma4TextConfig,
+    context: int = CONTEXT,
+    prefill_length: int = PREFILL_LENGTH,
+) -> None:
     """Write ``chunk-contract.json`` and ``gemma-runtime.json`` once every chunk is exported.
 
     Raises:
         FileNotFoundError: If a chunk has not been exported.
-        ValueError: If a chunk was exported under a different plan.
+        ValueError: If a chunk was exported under a different plan or weight format.
     """
     layouts = plan(config, context)
     entries = []
+    formats = set()
     for index, layout in enumerate(layouts):
         record = output / record_file(index)
         if not record.is_file():
             raise FileNotFoundError(f"Chunk {index} has not been exported to {output}")
-        entry = layout.contract(chunk_file(index), PREFILL_LENGTH)
-        if json.loads(record.read_text()) != entry:
+        entry = layout.contract(chunk_file(index), prefill_length)
+        recorded = json.loads(record.read_text())
+        if recorded.get("contract") != entry:
             raise ValueError(f"Chunk {index} was exported under a different plan")
+        formats.add(recorded.get("weightFormat"))
         entries.append(entry)
+    if len(formats) != 1 or None in formats:
+        raise ValueError(f"The chunks were exported in different weight formats: {formats}")
     contract = {
         "contract": CONTRACT,
         "contextLimit": context,
         "slidingCacheLength": config.sliding_window,
-        "prefillLength": PREFILL_LENGTH,
+        "prefillLength": prefill_length,
         "firstSharedLayer": config.num_hidden_layers - config.num_kv_shared_layers,
-        "weightFormat": WEIGHT_FORMAT,
+        "weightFormat": formats.pop(),
         "chunks": entries,
     }
     _write_json(output / CHUNK_CONTRACT, contract)
-    _write_json(output / RUNTIME_CONFIG, runtime_config(config, context))
+    _write_json(output / RUNTIME_CONFIG, runtime_config(config, context, prefill_length))
 
 
 def _write_json(path: Path, value: object) -> None:

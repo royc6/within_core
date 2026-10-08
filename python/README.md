@@ -6,35 +6,38 @@ that the within app downloads: eight uncompiled Core AI assets that the device c
 for the Neural Engine, plus the tables, contract and manifests the app's runtime needs. The
 published package is
 [royc6/within-gemma-4-e4b](https://huggingface.co/royc6/within-gemma-4-e4b), revision
-`lut6-c16384-20261001-01`; these commands reproduce it.
+`lut6-c16384-p64-20261008-01` (release 1.1; `lut6-c16384-20261001-01` is the 1.0 package with a
+16-wide prefill); these commands reproduce it.
 
 ## What the package contains
 
 | Part | Form |
 |---|---|
-| Decoder | 7 chunks of 6 layers (`chunk-00` to `chunk-06.aimodel`), each with a `step_1` (decode) entrypoint and, for the four chunks that own KV, a `prefill_16` entrypoint |
+| Decoder | 7 chunks of 6 layers (`chunk-00` to `chunk-06.aimodel`), each with a `step_1` (decode) entrypoint and, for the four chunks that own KV, a `prefill_64` entrypoint (`prefill_16` in the 1.0 package) |
 | Vocabulary head | `chunk-07.aimodel`: final norm, tied head in 16 row slices of 16384, logit softcap |
 | KV | host-held: each chunk reads its layers' caches as inputs and returns this step's fresh K/V; full-attention caches hold 16384 positions, sliding-attention caches are 512-slot rings; layers 24 to 41 reuse the KV of layers 22 and 23 |
 | Weights | MLP 6-bit palettes (`lut6`, groups of 16 output channels), attention and per-layer-embedding projections INT8 per channel, head INT4 per channel; activations, norms and KV FP16 |
 | Embeddings | `embeddings.f16` and `perLayerEmbeddings.f16`: raw FP16 tables the host reads row by row, outside the graph |
 | Metadata | `chunk-contract.json` (every chunk's inputs, outputs and shapes), `gemma-runtime.json` (geometry, RoPE, cache sizes, table formats), the unchanged tokenizer and generation configuration, `LICENSE` and `NOTICE`, and `installed-manifest.json` (equal to the app's bundled `ModelCatalog.json`) |
 
-Terms: a *chunk* is one Core AI asset; *prefill* processes prompt tokens in blocks of 16
-and returns only K/V; *decode* (`step_1`) produces logits for one token; *host-held KV*
-means the caches live in the app's memory, not in the graph.
+Terms: a *chunk* is one Core AI asset; *prefill* processes prompt tokens in blocks of the
+package's prefill width (64 for Full and Balanced, 128 for the lite packages) and returns
+only K/V; *decode* (`step_1`) produces logits for one token; *host-held KV* means the caches
+live in the app's memory, not in the graph.
 
 ## Modules
 
 | Module | Step |
 |---|---|
 | `checkpoint.py` | verified, bounded, offline reads from the local checkpoint (`reference-config.json` pins the revision and every file's SHA-256) |
+| `qat.py` | the same for Google's quantization-aware mobile checkpoint (`reference-config-qat.json`): its codes, scales and calibrated ranges read as stored, and its 2-bit tables |
 | `layers.py` | channels-first RMSNorm (as a layer norm), per-layer embedding projection, feedforward and PLE path |
 | `attention.py` | grouped-query attention over host-held KV |
 | `chunks.py` | decoder blocks, layer and head chunks, and their interface (`ChunkLayout`, `HeadLayout`) |
-| `quantize.py` | mixed-precision weight compression, including the head one row block at a time |
+| `quantize.py` | mixed-precision weight compression, including the head one row block at a time; Google's codes written as palettes with clamps for the lite packages |
 | `export.py` | the plan, building and authoring one chunk, `chunk-contract.json` and `gemma-runtime.json` |
 | `tables.py` | the two FP16 embedding tables |
-| `package.py` | package assembly and the manifest rules the app enforces |
+| `package.py` | package assembly, the manifest rules the app enforces, and the catalog of one package per tier |
 | `convert.py` | the command line |
 | `verify/trace.py` | reading `xctrace export` tables, checked against the recording's table of contents |
 | `verify/review.py` | the placement and numerics verdict of a recorded run (see "Verifying placement") |
@@ -68,18 +71,60 @@ WORK=/path/to/work
 
 # One process per chunk keeps a single chunk's weights in memory.
 for i in 0 1 2 3 4 5 6 7; do
-  python -m within_core.convert chunk "$i" --checkpoint "$CKPT" --output "$WORK/export"
+  python -m within_core.convert chunk "$i" --checkpoint "$CKPT" --output "$WORK/export" --prefill 64
 done
-python -m within_core.convert finalize --output "$WORK/export"
+python -m within_core.convert finalize --output "$WORK/export" --prefill 64
 python -m within_core.convert tables --checkpoint "$CKPT" --output "$WORK/tables"
 python -m within_core.convert package --export "$WORK/export" --tables "$WORK/tables" \
-  --checkpoint "$CKPT" --output "$WORK/release" --revision lut6-c16384-20261001-01 \
-  --base-url https://huggingface.co/royc6/within-gemma-4-e4b/resolve/lut6-c16384-20261001-01/
+  --checkpoint "$CKPT" --output "$WORK/release" --revision lut6-c16384-p64-20261008-01 \
+  --base-url https://huggingface.co/royc6/within-gemma-4-e4b/resolve/lut6-c16384-p64-20261008-01/
 ```
 
-The defaults are the published configuration (context 16384, 4 CPU threads). The package is
-in `$WORK/release/package`, and `$WORK/release/ModelCatalog.json` is the catalog the app
-bundles.
+The defaults are the published Full package (context 16384, 4 CPU threads). The package is
+in `$WORK/release/package`, and `$WORK/release/ModelCatalog.json` is that one package's
+catalog. `--context 4096` on the `chunk` and `finalize` steps, with the revision
+`lut6-c4096-p64-20261009-01`, rebuilds the Balanced package of release 1.1; without
+`--prefill 64` the commands rebuild the 16-wide 1.0 package `lut6-c16384-20261001-01`.
+
+### The lite packages
+
+The two lite packages are converted from Google's quantization-aware mobile checkpoint,
+[google/gemma-4-E4B-it-qat-mobile-transformers](https://huggingface.co/google/gemma-4-E4B-it-qat-mobile-transformers)
+at the revision pinned in `reference-config-qat.json` (a local copy, verified by SHA-256 like
+the BF16 one; `config.json` tells the two apart). The same commands apply, with the context
+and the prefill width of the package:
+
+```sh
+QAT=/path/to/gemma-4-E4B-it-qat-mobile-transformers
+for i in 0 1 2 3 4 5 6 7; do
+  python -m within_core.convert chunk "$i" --checkpoint "$QAT" --output "$WORK/lite-export" \
+    --context 4096 --prefill 128          # Lite 32K: --context 32000 --prefill 128
+done
+python -m within_core.convert finalize --output "$WORK/lite-export" --context 4096 --prefill 128
+python -m within_core.convert tables --checkpoint "$QAT" --output "$WORK/lite-tables"
+python -m within_core.convert package --export "$WORK/lite-export" --tables "$WORK/lite-tables" \
+  --checkpoint "$QAT" --output "$WORK/lite-release" --revision qat-lut-srq-p128-c4096-20261002-01 \
+  --base-url https://huggingface.co/royc6/within-gemma-4-e4b/resolve/qat-lut-srq-p128-c4096-20261002-01/
+```
+
+Nothing is re-quantized: every attention and MLP projection is Google's 4-bit codes written
+as a 16-entry palette with Google's per-channel scale (rounded once to FP16), the
+per-layer-embedding gate and projection are its 8-bit codes, the vocabulary head its 2-bit
+codes as a 4-entry palette, and each projection is clamped to the INT8 range Google
+calibrated for its input and output (compare and select, no rounding). The per-layer model
+projection stays FP16 as Google left it. `tables` writes the two tables as Google's packed
+2-bit codes with their F32 scales, which the engine decodes row by row (runtime configuration
+schema 2). The tokenizer, template and generation configuration come from the QAT folder;
+the published lite packages took them from the BF16 checkpoint, so `tokenizer_config.json`
+(key order), `tokenizer/config.json` (the quantization block) and `generation_config.json`
+(a version string) differ in bytes while the tokenizer and the template are identical.
+
+`catalog` writes the app's catalog of one package per tier from assembled packages:
+
+```sh
+python -m within_core.convert catalog --output "$WORK/ModelCatalog.json" --default liteFast \
+  --entry full "$WORK/release/package" --entry liteFast "$WORK/lite-release/package"
+```
 
 ## What "the same package" means
 
@@ -254,7 +299,10 @@ The tests compare the Neural Engine formulation with Transformers on toy-width m
 E4B's layer topology (norms, per-layer projection, feedforward, attention, and the chunks
 driven by a host loop through prefill and decode with ring caches), check the chunk
 contract and KV layout, the bounded head quantization and the manifest rules, and run the
-whole conversion on a tiny checkpoint. The verification tests review small synthetic
+whole conversion on a tiny checkpoint. The lite tests read a tiny checkpoint written in
+Google's QAT layout, compare its unpacking and dequantization with Transformers'
+``gemma_quant`` bit for bit, check the palettes, clamps, head and tables against the codes,
+and run the lite conversion on it. The verification tests review small synthetic
 recordings written the way `xctrace export` writes them (the pass, each way to fail, and
 the permutation branch) and run the FP32 reference on a tiny checkpoint. They take about
 45 seconds and execute no Core AI program.

@@ -25,21 +25,13 @@ public struct BudgetedContext: Sendable {
 /// Fits a conversation into the context, keeping its start fixed for as long as it can so that
 /// later prompts keep extending the KV cache instead of prefilling again.
 public enum ContextBudget {
-    /// The caller counts the actual rendered chat template, including role/control tokens.
-    public static func fit(
-        messages: [ChatTurn], contextLimit: Int, requestedOutput: Int,
-        countRenderedTokens: ([ChatTurn]) throws -> Int
-    ) throws -> BudgetedContext {
-        guard contextLimit > 1, requestedOutput > 0 else { throw ContextBudgetError.invalidConfiguration }
+    /// The turns a prompt renders when nothing is left out: complete user–assistant pairs, then the
+    /// latest user turn. Failed or interrupted empty replies do not create adjacent user turns in a
+    /// model template that requires alternating roles.
+    public static func complete(_ messages: [ChatTurn]) throws -> [ChatTurn] {
         guard messages.last?.role == .user else { throw ContextBudgetError.missingUserMessage }
-        let latest = [messages[messages.count - 1]]
-        let minimumCount = try countRenderedTokens(latest)
-        guard minimumCount < contextLimit else { throw ContextBudgetError.inputTooLong }
-        let output = min(requestedOutput, contextLimit - minimumCount)
         var retained: [ChatTurn] = []
         var pendingUser: ChatTurn?
-        // Failed or interrupted empty replies do not create adjacent user turns
-        // in a model template that requires alternating roles.
         for message in messages.dropLast() {
             if message.role == .user {
                 pendingUser = message
@@ -47,7 +39,20 @@ public enum ContextBudget {
                 retained += [user, message]; pendingUser = nil
             }
         }
-        retained += latest
+        return retained + [messages[messages.count - 1]]
+    }
+
+    /// The caller counts the actual rendered chat template, including role/control tokens.
+    public static func fit(
+        messages: [ChatTurn], contextLimit: Int, requestedOutput: Int,
+        countRenderedTokens: ([ChatTurn]) throws -> Int
+    ) throws -> BudgetedContext {
+        guard contextLimit > 1, requestedOutput > 0 else { throw ContextBudgetError.invalidConfiguration }
+        let retained = try complete(messages)
+        let latest = [messages[messages.count - 1]]
+        let minimumCount = try countRenderedTokens(latest)
+        guard minimumCount < contextLimit else { throw ContextBudgetError.inputTooLong }
+        let output = min(requestedOutput, contextLimit - minimumCount)
         guard try countRenderedTokens(retained) + output > contextLimit else {
             return BudgetedContext(messages: retained, outputTokens: output, trimmed: retained.count != messages.count)
         }

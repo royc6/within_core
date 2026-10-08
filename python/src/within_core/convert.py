@@ -1,13 +1,19 @@
 """Command line: convert a local Gemma 4 E4B checkpoint into the within model package.
 
 Pipeline position: the entry point that runs the steps in order. Every input and output is
-an explicit argument; the defaults are the published configuration::
+an explicit argument; the defaults are the published Full package::
 
     python -m within_core.convert chunk 0 --checkpoint CKPT --output EXPORT  # 0 to 7
     python -m within_core.convert finalize --output EXPORT
     python -m within_core.convert tables --checkpoint CKPT --output TABLES
     python -m within_core.convert package --export EXPORT --tables TABLES \\
         --checkpoint CKPT --output RELEASE --revision REV --base-url URL
+
+``--context 4096`` gives the Balanced package. With Google's QAT mobile checkpoint as
+``CKPT`` (recognised by its ``config.json``) the same commands give a lite package:
+``--context 4096 --prefill 128`` (Lite 4K) or ``--context 32000 --prefill 128`` (Lite 32K);
+``tables`` then writes the 2-bit tables. ``catalog`` writes the app's catalog of one package
+per tier.
 
 Run each ``chunk`` in its own process: one chunk's weights then fit in memory. Each command
 refuses to start unless the output volume keeps ``--min-free-gb`` free after its writes.
@@ -24,7 +30,7 @@ from pathlib import Path
 
 import torch
 
-from within_core import export, package, tables
+from within_core import export, package, qat, tables
 from within_core.checkpoint import LocalCheckpoint, pinned_config
 
 # Upper bound of one serialized chunk of the published plan.
@@ -61,25 +67,38 @@ def _tree_bytes(folder: Path) -> int:
     return sum(p.stat().st_size for p in folder.rglob("*") if p.is_file())
 
 
+def open_checkpoint(folder: Path) -> LocalCheckpoint | qat.QATCheckpoint:
+    """Open the BF16 checkpoint, or Google's QAT one if ``folder`` holds it."""
+    if qat.is_qat_checkpoint(folder):
+        return qat.QATCheckpoint(folder)
+    return LocalCheckpoint(folder)
+
+
 def run_chunk(arguments: argparse.Namespace) -> dict[str, object]:
     """Export one chunk."""
     require_space(arguments.output, CHUNK_BYTES, arguments.min_free_gb)
     torch.set_num_threads(arguments.threads)
-    checkpoint = LocalCheckpoint(arguments.checkpoint)
-    asset = export.export_chunk(checkpoint, arguments.index, arguments.output, arguments.context)
+    checkpoint = open_checkpoint(arguments.checkpoint)
+    asset = export.export_chunk(
+        checkpoint, arguments.index, arguments.output, arguments.context, arguments.prefill
+    )
     return {"asset": str(asset), "bytes": _tree_bytes(asset)}
 
 
 def run_finalize(arguments: argparse.Namespace) -> dict[str, object]:
     """Write the chunk contract and the runtime configuration."""
     require_space(arguments.output, 1_000_000, arguments.min_free_gb)
-    export.finalize(arguments.output, pinned_config(), arguments.context)
+    export.finalize(arguments.output, pinned_config(), arguments.context, arguments.prefill)
     return {"contract": str(arguments.output / export.CHUNK_CONTRACT)}
 
 
 def run_tables(arguments: argparse.Namespace) -> dict[str, object]:
-    """Write the FP16 embedding tables."""
-    checkpoint = LocalCheckpoint(arguments.checkpoint)
+    """Write the embedding tables: FP16 from the BF16 checkpoint, 2-bit from the QAT one."""
+    checkpoint = open_checkpoint(arguments.checkpoint)
+    if isinstance(checkpoint, qat.QATCheckpoint):
+        require_space(arguments.output, qat.table_bytes(checkpoint), arguments.min_free_gb)
+        descriptors = qat.write_tables(checkpoint, arguments.output)
+        return {"tables": [str(arguments.output / d["file"]) for d in descriptors.values()]}
     needed = sum(
         checkpoint.config.vocab_size * columns * 2
         for _, _, columns in tables.table_sources(checkpoint)
@@ -96,7 +115,7 @@ def run_package(arguments: argparse.Namespace) -> dict[str, object]:
     sources = (arguments.export, arguments.tables)
     copied = sum(_tree_bytes(s) for s in sources if s.stat().st_dev != volume)
     require_space(arguments.output, PACKAGE_BYTES + copied, arguments.min_free_gb)
-    checkpoint = LocalCheckpoint(arguments.checkpoint)
+    checkpoint = open_checkpoint(arguments.checkpoint)
     data = package.assemble(
         arguments.export,
         arguments.tables,
@@ -112,6 +131,16 @@ def run_package(arguments: argparse.Namespace) -> dict[str, object]:
     }
 
 
+def run_catalog(arguments: argparse.Namespace) -> dict[str, object]:
+    """Write the app's catalog of one package per tier."""
+    entries = [(tier, Path(folder)) for tier, folder in arguments.entry]
+    data = package.catalog(entries, arguments.default, arguments.output)
+    return {
+        "catalog": str(arguments.output),
+        "packages": [[row["tier"], row["manifest"]["revision"]] for row in data["packages"]],
+    }
+
+
 def parser() -> argparse.ArgumentParser:
     """Return the command-line parser."""
     root = argparse.ArgumentParser(prog="python -m within_core.convert", description=__doc__)
@@ -124,15 +153,19 @@ def parser() -> argparse.ArgumentParser:
     chunk.add_argument("--checkpoint", type=Path, required=True)
     chunk.add_argument("--output", type=Path, required=True, help="export folder")
     chunk.add_argument("--context", type=int, default=export.CONTEXT)
+    chunk.add_argument(
+        "--prefill", type=int, default=export.PREFILL_LENGTH, help="tokens per prefill call"
+    )
     chunk.add_argument("--threads", type=int, default=4, help="Torch CPU threads")
     chunk.set_defaults(run=run_chunk)
 
     finalize = commands.add_parser("finalize", help="write the contract once all chunks exist")
     finalize.add_argument("--output", type=Path, required=True, help="export folder")
     finalize.add_argument("--context", type=int, default=export.CONTEXT)
+    finalize.add_argument("--prefill", type=int, default=export.PREFILL_LENGTH)
     finalize.set_defaults(run=run_finalize)
 
-    table = commands.add_parser("tables", help="write the FP16 embedding tables")
+    table = commands.add_parser("tables", help="write the embedding tables")
     table.add_argument("--checkpoint", type=Path, required=True)
     table.add_argument("--output", type=Path, required=True, help="tables folder")
     table.set_defaults(run=run_tables)
@@ -145,6 +178,14 @@ def parser() -> argparse.ArgumentParser:
     assemble.add_argument("--revision", required=True)
     assemble.add_argument("--base-url", required=True)
     assemble.set_defaults(run=run_package)
+
+    catalog = commands.add_parser("catalog", help="write the app's catalog of one package per tier")
+    catalog.add_argument(
+        "--entry", nargs=2, action="append", metavar=("TIER", "PACKAGE"), required=True
+    )
+    catalog.add_argument("--default", required=True, choices=package.TIERS, help="the default tier")
+    catalog.add_argument("--output", type=Path, required=True, help="ModelCatalog.json to write")
+    catalog.set_defaults(run=run_catalog)
     return root
 
 

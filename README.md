@@ -11,6 +11,10 @@ it is published here with the conversion pipeline, the verification tools, a dem
 - **Result:** every decoder chunk runs on the Neural Engine. Decode runs at 16.4 tokens/s with the KV cache compiled
   for 16,384 tokens (32-token prompt, 512 generated tokens; conditions under [Results](#results)), and the peak memory
   footprint is 5.73 GB against the 6.44 GB per-app limit.
+- **Release 1.1:** four packages of the same model, two of them 3.18 GB from Google's quantization-aware checkpoint
+  (29.2 tokens/s in 3.25 GB at a 4,096-token capacity, or 13.5 tokens/s at 32,000), a prefill of up to 1,760 tokens/s,
+  and KV caches that are continued when a conversation outgrows its window, across Thinking replies and stops, and
+  for the system prompt from a file. See [Release 1.1](#release-11) and Section 7 of the report.
 - **Code:** a Swift package (the engine), Python (conversion and verification), and a SwiftUI demo app.
 - **License:** Apache License 2.0 for this repository's code and documentation; the model itself is subject to the
   Gemma 4 terms (see [Others](#others)).
@@ -59,7 +63,47 @@ conditions:
 | Model file | 10.5 GB | 3.66 GB |
 
 Speed, time to first token and memory all depend on these conditions, so the two sets of figures cannot be compared
-directly. Section 3.5 of the [technical report](REPORT.md) lists both with these caveats.
+directly. Section 3.5 of the [technical report](REPORT.md) lists both with these caveats; Release 1.1 measured all
+four packages under Google's conditions (below).
+
+## Release 1.1
+
+Four packages of the same model, read from one catalog, measured under Google's model-card conditions (a fixed
+1,024-token prompt, 256 generated tokens, five runs each started in the nominal thermal state, Release build,
+medians; `results/tiers.json`, report Section 7.1):
+
+| Package | Weights | KV capacity | Download | Prefill | Decode | First token | Peak memory |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Full `lut6-c16384-p64-20261008-01` | ours, 6-bit palettes, FP16 tables | 16,384 | 10.5 GB | 1,135 tokens/s | 16.9 tokens/s | 0.9 s | 5.71 GB |
+| Balanced `lut6-c4096-p64-20261009-01` | same | 4,096 | 10.5 GB | 1,705 | 22.4 | 0.6 s | 5.02 GB |
+| Lite 32K `qat-lut-srq-p128-c32000-20261002-01` | Google's QAT checkpoint as palettes, 2-bit tables | 32,000 | 3.18 GB | 871 | 13.5 | 1.2 s | 4.91 GB |
+| Lite 4K `qat-lut-srq-p128-c4096-20261002-01` | same | 4,096 | 3.18 GB | 1,760 | 29.2 | 0.6 s | 3.25 GB |
+| Google's LiteRT-LM GPU, iPhone 17 Pro | Google's | 2,048 | 3.66 GB | 1,189 | 25.1 | 0.9 s | 3.38 GB |
+
+![The four packages against Google's published GPU figure: prefill, decode, first token, peak memory](docs/figures/tiers.svg)
+
+The lite weights are Google's quantization-aware checkpoint written as palettes, with the activations clamped to
+Google's calibrated ranges; on the frozen quality set they are +0.2075 nats/token from the FP32 original, level with
+Google's own reference implementation (+0.215), against +0.0213 for the full weights, which are the original model
+quantized. The first load compiles the chunks for the Neural Engine (four and a half to eight minutes by tier);
+later loads take about a second.
+
+The engine keeps its KV caches across more situations (`results/kv_reuse.json`, report Sections 7.3–7.6):
+
+- **A conversation that outgrows the window** continues its cache: the oldest tokens after the system prompt are
+  evicted in blocks of 128 and the new prompt extends what is left. On Lite 32K the turn that overflows 32,000 tokens
+  takes 5.3 s to its first token instead of 35.8 s. Against a reference recomputation, facts both approaches keep are
+  answered equally (numbers 74/74 against 74/74), facts only the continued cache holds are answered 44/44, and the
+  health NLL is 0.0145 nats/token higher (limit 0.02).
+- **Thinking replies**: the hidden thought leaves the cache after each reply and the next prompt extends the answer.
+- **The system prompt**: its K/V is written to a file the first time and read back by later conversations; a
+  317-token system prompt goes from 3.3 s to 0.19 s to the first token on the Full package.
+- **A stopped reply** keeps the cache; the next turn reuses it.
+
+The prefill runs a prompt's remainder as one padded call, and the lite packages are exported with a 128-wide prefill
+function. The host's part of a 128-token prefill call on Lite 4K is 1 ms, down from half the call when every input
+array was built one value at a time; the rest is the Neural Engine's and the K/V copy (`results/prefill.json`,
+report Section 7.2).
 
 ## How it works
 
@@ -83,7 +127,7 @@ failed.
 
 - An iPhone with an A19 Pro chip or later and 12 GB of memory, running iOS 27.
 - An app with the increased memory limit entitlement (`com.apple.developer.kernel.increased-memory-limit`).
-- About 10.5 GB of storage for the model package.
+- About 10.5 GB of storage for the Full or Balanced package, 3.2 GB for a Lite package.
 - Xcode 27 to build.
 
 ## Quick start (Swift)
@@ -95,7 +139,7 @@ the device (the demo shows a download that checks every file's SHA-256), then:
 import WithinCore
 import WithinCoreBase
 
-let engine = try await Gemma4Engine(folder: packageFolder)
+let engine = try await Gemma4Engine(folder: packageFolder)   // prefixStore: a folder keeps the system prompt's K/V
 let options = Gemma4Engine.Options(temperature: 0.7, topK: 64, maxOutputTokens: 1024, thinking: false)
 try await engine.generate(system: "", turns: [ChatTurn(role: .user, text: "Hello")], options: options) { event in
     if case .text(let replySoFar) = event { print(replySoFar) }  // the whole reply so far, once per token
@@ -103,18 +147,26 @@ try await engine.generate(system: "", turns: [ChatTurn(role: .user, text: "Hello
 ```
 
 The first load compiles every chunk for the Neural Engine and takes minutes; later loads come from the system's
-model cache. Long generation makes any phone warm, and thinner models warm up and slow down sooner.
+model cache. Long generation makes any phone warm, and thinner models warm up and slow down sooner. `ModelCatalog`
+reads a catalog of one package per tier (`catalogVersion` 2) or a single package's manifest.
 
 ## Model package
 
-The package is [royc6/within-gemma-4-e4b](https://huggingface.co/royc6/within-gemma-4-e4b) on Hugging Face at
-revision `lut6-c16384-20261001-01`, converted from [Gemma 4 E4B-it](https://huggingface.co/google/gemma-4-E4B-it):
-10.5 GB, of which 3.5 GB are chunk weights and 7.0 GB FP16 embedding tables. The engine never downloads anything; the
-demo downloads the package only when the user starts it, with cellular data off unless allowed.
+The packages are revisions of [royc6/within-gemma-4-e4b](https://huggingface.co/royc6/within-gemma-4-e4b) on
+Hugging Face. `lut6-c16384-p64-20261008-01` (Full) is converted from [Gemma 4 E4B-it](https://huggingface.co/google/gemma-4-E4B-it):
+10.5 GB, of which 3.5 GB are chunk weights and 7.0 GB FP16 embedding tables; `lut6-c4096-p64-20261009-01` (Balanced)
+is the same weights with a 4,096-token KV capacity; both prefill 64 tokens per call (`lut6-c16384-20261001-01`, the
+1.0 package, 16). `qat-lut-srq-p128-c4096-20261002-01` and
+`qat-lut-srq-p128-c32000-20261002-01` (Lite 4K and 32K) are converted from Google's
+[gemma-4-E4B-it-qat-mobile-transformers](https://huggingface.co/google/gemma-4-E4B-it-qat-mobile-transformers):
+3.18 GB, of which 2.23 GB are chunk weights and 0.92 GB 2-bit embedding tables. The engine never downloads anything;
+the demo downloads the Full package only when the user starts it, with cellular data off unless allowed.
 
-[`python/`](python/README.md) rebuilds the package offline from a local copy of the checkpoint. A rebuild has the
-same program text and byte-identical weights; the files themselves are not byte-identical, because the converter
-names subgraphs at random.
+[`python/`](python/README.md) rebuilds all four packages offline from local copies of the two checkpoints: the
+Full and Balanced packages from the BF16 checkpoint (`--context 16384` or `4096`, `--prefill 64`), the Lite
+packages from the QAT checkpoint (`--context 4096` or `32000`, `--prefill 128`). A rebuild has the same program
+text and byte-identical weights; the files themselves are not byte-identical, because the converter names
+subgraphs at random.
 
 ## Verify placement
 
@@ -126,7 +178,7 @@ recording whether the chunks ran on the Neural Engine and whether their outputs 
 | Path | Contents |
 | --- | --- |
 | [`Sources/WithinCore`](Sources/WithinCore) | Swift: the chunked decoder on Core AI with host-held KV, and `Gemma4Engine`, the generation loop |
-| [`Sources/WithinCoreBase`](Sources/WithinCoreBase) | Swift, no Core AI: the package format and its checks, the chunk contract, rotary tables and attention masks, the prefill schedule, embedding lookup, the context budget |
+| [`Sources/WithinCoreBase`](Sources/WithinCoreBase) | Swift, no Core AI: the package format, catalog and checks, the chunk contract, rotary tables and attention masks, the prefill schedule, embedding lookup (FP16 and 2-bit tables), the context budget, the slot table and KV-SLIDE plan, recall |
 | [`python/`](python/) | Conversion from a local checkpoint to the model package, and the placement and numerics verification |
 | [`examples/WithinDemo`](examples/WithinDemo) | A minimal iPhone app: download the package, chat, and run the performance procedure |
 | [`REPORT.md`](REPORT.md), [`results/`](results/), [`docs/figures/`](docs/figures/) | The technical report, its result summaries and figures |

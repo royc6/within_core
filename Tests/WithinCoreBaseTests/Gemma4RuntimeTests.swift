@@ -59,6 +59,29 @@ private func configuration() throws -> Gemma4RuntimeConfiguration {
     #expect(Array(rope.cos[0..<8]) == Array(rope.cos[32..<40]))
 }
 
+@Test func gemmaInt2EmbeddingLookupDecodesGoogleQATCodes() throws {
+    let folder = try temporaryFolder()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    // Rows [-2, -1, 0, 1, 1, 0, -1, -2] and [0, 0, 0, 0, 1, 1, 1, 1]: code + 2, four per byte, low bits first.
+    try Data([228, 27, 170, 255]).write(to: folder.appending(path: "table.int2"))
+    let factors: [Float] = [0.5, 2, 1, 0.25]
+    try factors.withUnsafeBytes { try Data($0).write(to: folder.appending(path: "table.scales.f32")) }
+    let scales = Gemma4EmbeddingDescriptor.Scales(file: "table.scales.f32", columnsPerScale: 4)
+    let descriptor = Gemma4EmbeddingDescriptor(file: "table.int2", format: .int2, rows: 2, columns: 8, scales: scales)
+    let table = try Gemma4Embeddings(folder: folder, descriptor: descriptor)
+    #expect(
+        try table.gather(tokens: [1, 0], layers: 2, scale: 3)
+            == [0, -3, 0.75, 6, 0, -1.5, 0.75, 0, 0, 0, 0.75, -6, 0, 1.5, 0.75, -12])
+    #expect(throws: Gemma4RuntimeError.self) {
+        try Gemma4EmbeddingDescriptor(file: "table.int2", format: .int2, rows: 2, columns: 8).validate()
+    }
+    #expect(throws: Gemma4RuntimeError.self) {
+        try Gemma4EmbeddingDescriptor(file: "table.f16", format: .float16, rows: 2, columns: 8, scales: scales).validate()
+    }
+    try Data([0]).write(to: folder.appending(path: "table.scales.f32"), options: .atomic)
+    #expect(throws: Gemma4RuntimeError.self) { try Gemma4Embeddings(folder: folder, descriptor: descriptor) }
+}
+
 private func temporaryFolder() throws -> URL {
     let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

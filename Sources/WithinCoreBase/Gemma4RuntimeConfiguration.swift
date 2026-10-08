@@ -4,7 +4,7 @@ import Foundation
 /// inputs computed from it for every call: rotary tables and attention masks. Shapes refer to the
 /// exported package, not the upstream model's theoretical context limit.
 public struct Gemma4RuntimeConfiguration: Codable, Sendable {
-    /// The file format version; 1.
+    /// The file format version: 1, or 2 when an embedding table may be `int2` (v2 lite tier).
     public var schemaVersion: Int
     /// Width of the hidden state between layers.
     public var hiddenSize: Int
@@ -48,7 +48,7 @@ public struct Gemma4RuntimeConfiguration: Codable, Sendable {
 
     /// Checks every value is in range and consistent; with `requireE4B`, that it is exactly Gemma 4 E4B.
     public func validate(requireE4B: Bool = true) throws {
-        guard schemaVersion == 1, (4...262_144).contains(vocabularySize),
+        guard (1...2).contains(schemaVersion), (4...262_144).contains(vocabularySize),
             (4...2560).contains(hiddenSize), (2...42).contains(layerTypes.count),
             (0..<layerTypes.count).contains(sharedLayerCount),
             layerTypes.allSatisfy({ ["sliding_attention", "full_attention"].contains($0) }),
@@ -59,12 +59,15 @@ public struct Gemma4RuntimeConfiguration: Codable, Sendable {
             localTheta.isFinite, localTheta >= 1, globalTheta.isFinite, globalTheta >= 1,
             globalRotaryFraction.isFinite, (0...1).contains(globalRotaryFraction),
             (1...512).contains(slidingWindow), (8...32000).contains(contextLimit),
-            (2...128).contains(prefillLength), prefillLength <= contextLimit,
+            (2...256).contains(prefillLength), prefillLength <= contextLimit,
             embeddings.rows == vocabularySize, embeddings.columns == hiddenSize,
             perLayerEmbeddings.rows == vocabularySize,
             perLayerEmbeddings.columns == layerTypes.count * perLayerInputSize
         else { throw Gemma4RuntimeError.invalidPackage }
         try embeddings.validate(); try perLayerEmbeddings.validate()
+        guard schemaVersion == 2 || (embeddings.format == .float16 && perLayerEmbeddings.format == .float16) else {
+            throw Gemma4RuntimeError.invalidPackage
+        }
         if requireE4B {
             guard vocabularySize == 262_144, hiddenSize == 2560, layerTypes.count == 42,
                 sharedLayerCount == 18, perLayerInputSize == 256, keyValueHeads == 2,
@@ -78,9 +81,15 @@ public struct Gemma4RuntimeConfiguration: Codable, Sendable {
         }
     }
 
-    /// BC1S full-dimension RoPE, including Gemma 4's unrotated global axes.
+    /// Positions the model was trained on (`max_position_embeddings` of Gemma 4 E4B). The package's
+    /// `contextLimit` is its slot count, which is smaller: with host-held caches a conversation
+    /// keeps its positions while old slots are reused (KV-SLIDE, REPORT.md Section 7.3).
+    public static let maximumPosition = 131_072
+
+    /// BC1S full-dimension RoPE, including Gemma 4's unrotated global axes. Positions run to
+    /// `maximumPosition`, past the slot count.
     public func rotary(step: Int, length: Int, global: Bool) throws -> (cos: [Float16], sin: [Float16]) {
-        try validatePosition(step: step, length: length)
+        try validateRotaryPosition(step: step, length: length)
         let dimension = global ? globalHeadDimension : localHeadDimension
         let theta = global ? globalTheta : localTheta
         let rotated = global ? Int(globalRotaryFraction * Float(dimension) / 2) : dimension / 2
@@ -104,14 +113,20 @@ public struct Gemma4RuntimeConfiguration: Codable, Sendable {
         try validatePosition(step: step, length: length)
         let width = contextLimit + length
         var values = [Float16](repeating: -10_000, count: length * width)
-        for query in 0..<length {
-            let position = step + query
-            let first = global ? 0 : max(0, position - slidingWindow + 1)
-            if first < step {
-                for key in first..<step { values[query * width + key] = 0 }
-            }
-            for fresh in 0...query where step + fresh >= first {
-                values[query * width + contextLimit + fresh] = 0
+        // Each row is two runs of zeros: the visible old keys and the causal fresh keys.
+        values.withUnsafeMutableBufferPointer { values in
+            for query in 0..<length {
+                let position = step + query
+                let first = global ? 0 : max(0, position - slidingWindow + 1)
+                let row = query * width
+                if first < step {
+                    UnsafeMutableBufferPointer(rebasing: values[(row + first)..<(row + step)]).update(repeating: 0)
+                }
+                let fresh = max(0, first - step)  // the first fresh key a sliding query still sees
+                if fresh <= query {
+                    UnsafeMutableBufferPointer(rebasing: values[(row + contextLimit + fresh)...(row + contextLimit + query)])
+                        .update(repeating: 0)
+                }
             }
         }
         return values
@@ -120,22 +135,31 @@ public struct Gemma4RuntimeConfiguration: Codable, Sendable {
     /// Host-held sliding-attention ring of `slidingWindow` slots plus this call's
     /// fresh K/V: [L, window + L]. Slot j holds the latest position p < step with
     /// p % window == j (older ones were overwritten); it is visible to query q
-    /// when q - p < window. Fresh keys are causal within the same window.
-    public func ringMask(step: Int, length: Int) throws -> [Float16] {
-        try validatePosition(step: step, length: length)
+    /// when q - p < window and p is not in `hidden` (positions evicted from the cache).
+    /// Fresh keys are causal within the same window.
+    public func ringMask(step: Int, length: Int, hidden: Set<Int> = []) throws -> [Float16] {
+        try validateRotaryPosition(step: step, length: length)
         let window = slidingWindow, width = window + length
         var values = [Float16](repeating: -10_000, count: length * width)
+        let held = (0..<window).map { slot in
+            let held = step - 1 - ((step - 1 - slot) % window + window) % window  // floor modulo
+            return hidden.contains(held) ? -1 : held
+        }
         for query in 0..<length {
             let position = step + query
-            if step > 0 {
-                for slot in 0..<window {
-                    let held = step - 1 - ((step - 1 - slot) % window + window) % window  // floor modulo
-                    if held >= 0, position - held < window { values[query * width + slot] = 0 }
-                }
+            for slot in 0..<window where held[slot] >= 0 && position - held[slot] < window {
+                values[query * width + slot] = 0
             }
             for fresh in 0...query where query - fresh < window { values[query * width + window + fresh] = 0 }
         }
         return values
+    }
+
+    /// Throws unless `length` tokens starting at `step` fit one call and the model's positions.
+    public func validateRotaryPosition(step: Int, length: Int) throws {
+        guard step >= 0, length > 0, length <= prefillLength, step <= Self.maximumPosition - length else {
+            throw Gemma4RuntimeError.contextExceeded
+        }
     }
 
     /// Throws unless `length` tokens starting at `step` fit one call and the context.

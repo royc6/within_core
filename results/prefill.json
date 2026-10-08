@@ -1,0 +1,635 @@
+{
+ "claims": [
+  "A prompt's remainder of at least four tokens that does not fill a prefill call runs as one padded call (copies of the last token, hidden by the causal masks, only the real tokens' K/V written back) instead of one single-token call per token: with a 64-wide lite package the 1,024-token prompt went from 448 to 910 tokens/s and the first token from 2.3 to 1.13 s, decode unchanged.",
+  "The Neural Engine's prefill throughput on this graph is flat from a width of 128 on: 407 / 910 / 990 / 1,003 tokens/s at widths 16 / 64 / 128 / 256 for the 1,024-token prompt, first token 2.5 / 1.13 / 1.04 / 1.03 s. The lite packages are exported 128 wide; Full and Balanced, 16 wide in 1.0 (299 and 411 tokens/s; 426 and 570 once the host's inputs were copied in one run), are exported 64 wide in 1.1 (1,135 and 1,705 tokens/s): on Balanced 128 adds 11% for 0.85 GB more memory, and on Full 128 does not fit (widthByTier).",
+  "A 128-wide prefill call of chunks 0-3 takes 67 ms on the 4,096-token lite package (60 ms of it the Neural Engine's) and 136 ms at 32,000 (125 ms) once the host's input arrays are copied in one run each. Before that the engine built every input with NDArray(scalars:), which copies one value at a time (about 20 ns each on an iPhone 18 Pro): the host's part of a call was 56 ms at 4,096 and 150 ms at 32,000, and the same calls took 124 and 286 ms (callSplitBefore).",
+  "The lite packages prefill the 1,024-token prompt at 1,760 tokens/s (4,096) and 871 tokens/s (32,000), first token in 0.59 and 1.19 s; decode 29.2 and 13.5 tokens/s. The published LiteRT-LM GPU figures for the same model on an iPhone 17 Pro at a 2,048-token capacity are 1,189 tokens/s, 0.9 s and 25.1 tokens/s."
+ ],
+ "mechanism": {
+  "remainder": "tokens except the last run through chunks 0-3 width tokens per call; a remainder of at least width/16 tokens (at least 2) is padded to one call; shorter remainders run one per call (prefill_1); singles also when the capacity left is under one width",
+  "embeddingGather": "up to 256 tokens per gather (the widest prefill call)",
+  "exporter": "the prefill width is an export option (16, 64, 128 or 256); the runtime configuration records it and the plan reads it"
+ },
+ "conditions": {
+  "device": "iPhone 18 Pro, iOS 27.2",
+  "build": "Release, wired",
+  "procedure": "model-card procedure (tiers.json), same weights (Google's QAT checkpoint, clamped) exported at four widths, KV capacity 4,096",
+  "date": "October 2026"
+ },
+ "widthCurve": {
+  "rows": [
+   {
+    "width": 16,
+    "callMsChunks0to3": 35,
+    "inCallTokensPerSecond": 450,
+    "prefillTokensPerSecond": 407,
+    "firstTokenSeconds": 2.5,
+    "memoryMB": 2931,
+    "compileSecondsChunks0to3": "about 35"
+   },
+   {
+    "width": 64,
+    "callMsChunks0to3": 67,
+    "inCallTokensPerSecond": 947,
+    "prefillTokensPerSecond": 910,
+    "firstTokenSeconds": 1.13,
+    "memoryMB": 2933,
+    "compileSecondsChunks0to3": "34-40"
+   },
+   {
+    "width": 128,
+    "callMsChunks0to3": 124,
+    "inCallTokensPerSecond": 1032,
+    "prefillTokensPerSecond": 990,
+    "firstTokenSeconds": 1.04,
+    "memoryMB": 3250,
+    "compileSecondsChunks0to3": "45-57"
+   },
+   {
+    "width": 256,
+    "callMsChunks0to3": 245,
+    "inCallTokensPerSecond": 1046,
+    "prefillTokensPerSecond": 1003,
+    "firstTokenSeconds": 1.03,
+    "memoryMB": 3234,
+    "compileSecondsChunks0to3": "68-70"
+   }
+  ],
+  "marginalMsPerToken": {
+   "16to64": 0.66,
+   "64to128": 0.89,
+   "128to256": 0.95
+  },
+  "decision": "128 is the default width of the lite packages; 256 adds 1% and compiles longer",
+  "sources": "perf-v2-qat-lut-srq-c4096-20261002-01-02 (16), perf-v2-qat-lut-srq-p64-c4096-20261002-01-02 (64), perf-v2-qat-lut-srq-p128-c4096-20261002-01 (128), perf-v2-qat-lut-srq-p256-c4096-20261002-01-02 (256); private run folders, archived",
+  "note": "Measured before the host's input arrays were copied in one run (callSplitBefore): the host's share was the same at every width, so the curve's shape stands and its levels are low."
+ },
+ "widthByTier": {
+  "note": "the model-card procedure (tiers.json) on each tier at the prefill widths tried once the host's inputs were copied in one run; peak footprint is the largest of the five runs, minimum available the smallest; the width of each 1.1 package was chosen from these rows",
+  "rows": [
+   {
+    "tier": "full",
+    "width": 16,
+    "prefillTokensPerSecond": 426,
+    "firstTokenSeconds": 2.4,
+    "decodeTokensPerSecond": 16.9,
+    "peakFootprintGB": 5.75,
+    "minimumAvailableGB": 0.7,
+    "package": "lut6-c16384-20261001-01"
+   },
+   {
+    "tier": "full",
+    "width": 64,
+    "prefillTokensPerSecond": 1135,
+    "firstTokenSeconds": 0.9,
+    "decodeTokensPerSecond": 16.9,
+    "peakFootprintGB": 5.71,
+    "minimumAvailableGB": 0.73,
+    "package": "lut6-c16384-p64-20261008-01",
+    "chosen": true
+   },
+   {
+    "tier": "full",
+    "width": 128,
+    "package": "lut6-c16384-p128-20261009-01 (not published)",
+    "result": "did not fit: the first prefill call reached a 6.27 GB footprint with 176 MB of memory available and the engine's low-memory release cancelled the generation; a steady 128-wide call took 92 ms, about 1,390 tokens/s inside the call"
+   },
+   {
+    "tier": "balance",
+    "width": 16,
+    "prefillTokensPerSecond": 570,
+    "firstTokenSeconds": 1.8,
+    "decodeTokensPerSecond": 22.4,
+    "peakFootprintGB": 5.13,
+    "minimumAvailableGB": 1.36,
+    "package": "lut6-c4096-20261001-01"
+   },
+   {
+    "tier": "balance",
+    "width": 64,
+    "prefillTokensPerSecond": 1705,
+    "firstTokenSeconds": 0.6,
+    "decodeTokensPerSecond": 22.4,
+    "peakFootprintGB": 5.02,
+    "minimumAvailableGB": 1.43,
+    "package": "lut6-c4096-p64-20261009-01",
+    "chosen": true
+   },
+   {
+    "tier": "balance",
+    "width": 128,
+    "prefillTokensPerSecond": 1898,
+    "firstTokenSeconds": 0.55,
+    "decodeTokensPerSecond": 22.5,
+    "peakFootprintGB": 5.87,
+    "minimumAvailableGB": 0.58,
+    "package": "lut6-c4096-p128-20261008-01 (not published)"
+   },
+   {
+    "tier": "liteLong",
+    "width": 64,
+    "prefillTokensPerSecond": 788,
+    "firstTokenSeconds": 1.31,
+    "decodeTokensPerSecond": 13.4,
+    "peakFootprintGB": 4.48,
+    "minimumAvailableGB": 1.96,
+    "package": "qat-lut-srq-p64-c32000-20261009-01 (not published)"
+   },
+   {
+    "tier": "liteLong",
+    "width": 128,
+    "prefillTokensPerSecond": 871,
+    "firstTokenSeconds": 1.19,
+    "decodeTokensPerSecond": 13.5,
+    "peakFootprintGB": 4.91,
+    "minimumAvailableGB": 1.55,
+    "package": "qat-lut-srq-p128-c32000-20261002-01",
+    "chosen": true
+   },
+   {
+    "tier": "liteFast",
+    "width": 128,
+    "prefillTokensPerSecond": 1760,
+    "firstTokenSeconds": 0.59,
+    "decodeTokensPerSecond": 29.2,
+    "peakFootprintGB": 3.25,
+    "minimumAvailableGB": 3.19,
+    "package": "qat-lut-srq-p128-c4096-20261002-01",
+    "chosen": true,
+    "note": "the lite weights' 16/64/128/256 curve is widthCurve"
+   }
+  ],
+  "decision": "Full and Balanced 64 wide (Balanced's 128 costs 0.85 GB for 11%; Full's 128 does not fit), Lite 32K and Lite 4K 128",
+  "compile": "the 64-wide lut6 chunks compile longer at the first load: 448 s for Full and 459 s for Balanced against 147 and 186 s for the 16-wide packages and 194 s for Balanced's 128-wide export (tiers.json compile)",
+  "degradedCompiles": "three of the seven first loads behind these rows compiled one chunk in a fraction of its usual time and ran it many times slower per step, and the content-keyed cache kept the result: Full 64's chunk 0 (20 s instead of 107, its prefill function prepared in 1,011 ms instead of 14, 24 ms a step instead of 9; the procedure still accepted the run at 961 tokens/s and 13.7 tokens/s decode), Balanced 64's chunk 7 (1.8 s instead of 5.2, prepared in 232 ms instead of 13, 71.8 ms a step instead of 3.4) and Lite 32K 64's chunk 0 (2.2 s instead of 136, 83 ms instead of 11, 234 ms a step instead of 11). Purging the cache and compiling again on an idle phone gave a normal compile each time; the rows above are those runs",
+  "sources": "phone-perf-full-p64-20261009-02, phone-perf-balanced-p64-20261009-02, phone-perf-lite32k-p64-20261009-02, phone-perf-balanced-p128-20261009-01, phone-perf-full-p128-20261009-01 and the 16-wide runs of tiers.json (private run folders, October 2026)"
+ },
+ "paddedRemainder": {
+  "package": "64-wide lite package qat-lut-srq-p64-c4096-20261002-01",
+  "before": {
+   "prefillTokensPerSecond": 448,
+   "firstTokenSeconds": 2.3,
+   "note": "1,023 prompt tokens except the last: 15 calls of 64 and 63 single-token calls"
+  },
+  "after": {
+   "prefillTokensPerSecond": 910,
+   "firstTokenSeconds": 1.13
+  },
+  "decodeTokensPerSecond": "27.7 both",
+  "sources": "perf-v2-qat-lut-srq-p64-c4096-20261002-01 and -02 (archived)"
+ },
+ "perCall": {
+  "note": "from the Diagnostics of the tiers.json runs: median total ms of one prefill call over chunks 0-3 and the per-chunk medians (Full and Balanced 64 wide since 1.1; their 16-wide calls, 36.3 and 26.9 ms, are in callSplitWidth16)",
+  "rows": [
+   {
+    "tier": "full",
+    "function": "prefill_64",
+    "calls": 16,
+    "totalMsMedian": 51.8,
+    "chunkMsMedian": [
+     14.8,
+     13.4,
+     13.4,
+     5.9
+    ]
+   },
+   {
+    "tier": "balance",
+    "function": "prefill_64",
+    "calls": 16,
+    "totalMsMedian": 34.4,
+    "chunkMsMedian": [
+     9.2,
+     7.9,
+     7.9,
+     5.8
+    ]
+   },
+   {
+    "tier": "liteLong",
+    "function": "prefill_128",
+    "calls": 8,
+    "totalMsMedian": 135.8,
+    "chunkMsMedian": [
+     38.7,
+     37.2,
+     37.3,
+     12.0
+    ]
+   },
+   {
+    "tier": "liteFast",
+    "function": "prefill_128",
+    "calls": 8,
+    "totalMsMedian": 67.2,
+    "chunkMsMedian": [
+     16.5,
+     15.6,
+     15.7,
+     12.0
+    ]
+   }
+  ]
+ },
+ "callSplit": {
+  "note": "where one call's time goes, medians over the model-card runs of tiers.json (the first tenth of the calls, the warm-ups, left out): inputMs is the host's work before the chunks run (token embeddings and per-layer embeddings looked up and decoded, rotary tables and masks for the call's positions), neuralEngineMs the sum of the chunks' predictions, kvWriteMs the fresh K/V copied into the host caches, readbackMs the logits read back (decode only), otherMs the remainder (dispatch and synchronisation of the chunk calls)",
+  "claims": [
+   "With the input arrays copied in one run each, the Neural Engine's own time is 89% of a lite prefill call at 4,096 (60 of 67 ms) and 92% at 32,000 (125 of 136 ms); the host's input preparation is 0.7 and 2.7 ms, dispatch under 1 ms, the K/V copy 6-7 ms. Inside the Neural Engine the lite weights prefill at about 2,140 tokens/s at 4,096.",
+   "Decode is the Neural Engine's: 96% of a step (32.4 of 33.8 ms on Lite 4K; 71.6 of 73.1 ms on Lite 32K), with 0.1 ms of input preparation and 1 ms of logit readback.",
+   "Full's and Balanced's 64-wide calls take 52 and 34 ms (0.8 and 0.4 ms of host input, 47 and 31 ms on the Neural Engine, 3.1 ms of K/V copy): 1,350 and 2,085 tokens/s inside the call, 1,135 and 1,705 for the 1,024-token prompt, first token 0.9 and 0.6 s, decode 16.9 and 22.4 tokens/s. Their 16-wide calls had gone from 52 and 38 ms to 36 and 27 ms when the host's inputs were copied in one run (426 and 570 tokens/s, callSplitWidth16)."
+  ],
+  "rows": [
+   {
+    "tier": "full",
+    "function": "prefill_64",
+    "calls": 128,
+    "totalMs": 51.78,
+    "inputMs": 0.82,
+    "neuralEngineMs": 47.44,
+    "kvWriteMs": 3.13,
+    "readbackMs": 0.0,
+    "otherMs": 0.38,
+    "chunkMs": [
+     14.8,
+     13.41,
+     13.43,
+     5.86
+    ]
+   },
+   {
+    "tier": "full",
+    "function": "step_1",
+    "calls": 1472,
+    "totalMs": 58.47,
+    "inputMs": 0.14,
+    "neuralEngineMs": 57.02,
+    "kvWriteMs": 0.17,
+    "readbackMs": 0.95,
+    "otherMs": 0.2,
+    "chunkMs": [
+     9.03,
+     7.63,
+     7.63,
+     7.63,
+     7.23,
+     7.23,
+     7.23,
+     3.46
+    ]
+   },
+   {
+    "tier": "balance",
+    "function": "prefill_64",
+    "calls": 128,
+    "totalMs": 34.39,
+    "inputMs": 0.37,
+    "neuralEngineMs": 30.71,
+    "kvWriteMs": 3.07,
+    "readbackMs": 0.0,
+    "otherMs": 0.24,
+    "chunkMs": [
+     9.17,
+     7.86,
+     7.86,
+     5.84
+    ]
+   },
+   {
+    "tier": "balance",
+    "function": "step_1",
+    "calls": 1472,
+    "totalMs": 44.14,
+    "inputMs": 0.12,
+    "neuralEngineMs": 42.72,
+    "kvWriteMs": 0.15,
+    "readbackMs": 0.95,
+    "otherMs": 0.2,
+    "chunkMs": [
+     6.58,
+     5.64,
+     5.65,
+     5.65,
+     5.27,
+     5.26,
+     5.26,
+     3.42
+    ]
+   },
+   {
+    "tier": "liteLong",
+    "function": "prefill_128",
+    "calls": 64,
+    "totalMs": 135.75,
+    "inputMs": 2.66,
+    "neuralEngineMs": 125.19,
+    "kvWriteMs": 7.19,
+    "readbackMs": 0.0,
+    "otherMs": 0.72,
+    "chunkMs": [
+     38.68,
+     37.23,
+     37.29,
+     12.02
+    ]
+   },
+   {
+    "tier": "liteLong",
+    "function": "step_1",
+    "calls": 1472,
+    "totalMs": 73.07,
+    "inputMs": 0.15,
+    "neuralEngineMs": 71.58,
+    "kvWriteMs": 0.17,
+    "readbackMs": 0.96,
+    "otherMs": 0.2,
+    "chunkMs": [
+     11.34,
+     9.85,
+     9.88,
+     9.89,
+     9.52,
+     9.5,
+     9.5,
+     2.07
+    ]
+   },
+   {
+    "tier": "liteFast",
+    "function": "prefill_128",
+    "calls": 64,
+    "totalMs": 67.21,
+    "inputMs": 0.69,
+    "neuralEngineMs": 59.75,
+    "kvWriteMs": 6.28,
+    "readbackMs": 0.0,
+    "otherMs": 0.51,
+    "chunkMs": [
+     16.51,
+     15.59,
+     15.65,
+     12.03
+    ]
+   },
+   {
+    "tier": "liteFast",
+    "function": "step_1",
+    "calls": 1472,
+    "totalMs": 33.84,
+    "inputMs": 0.12,
+    "neuralEngineMs": 32.38,
+    "kvWriteMs": 0.17,
+    "readbackMs": 0.96,
+    "otherMs": 0.21,
+    "chunkMs": [
+     5.5,
+     4.25,
+     4.27,
+     4.26,
+     4.0,
+     4.01,
+     4.0,
+     2.08
+    ]
+   }
+  ]
+ },
+ "callSplitWidth16": {
+  "note": "the 16-wide Full and Balanced packages (lut6-c16384-20261001-01, lut6-c4096-20261001-01) on the engine whose input arrays are copied in one run, before the 64-wide export; same columns as callSplit",
+  "rows": [
+   {
+    "tier": "full",
+    "function": "prefill_16",
+    "calls": 512,
+    "totalMs": 36.33,
+    "inputMs": 0.24,
+    "neuralEngineMs": 35.12,
+    "kvWriteMs": 0.81,
+    "readbackMs": 0.0,
+    "otherMs": 0.17,
+    "chunkMs": [
+     10.72,
+     9.59,
+     9.59,
+     5.11
+    ]
+   },
+   {
+    "tier": "full",
+    "function": "step_1",
+    "calls": 1472,
+    "totalMs": 58.51,
+    "inputMs": 0.14,
+    "neuralEngineMs": 57.02,
+    "kvWriteMs": 0.17,
+    "readbackMs": 0.96,
+    "otherMs": 0.22,
+    "chunkMs": [
+     8.99,
+     7.62,
+     7.62,
+     7.62,
+     7.21,
+     7.22,
+     7.22,
+     3.54
+    ]
+   },
+   {
+    "tier": "balance",
+    "function": "prefill_16",
+    "calls": 512,
+    "totalMs": 26.91,
+    "inputMs": 0.17,
+    "neuralEngineMs": 25.78,
+    "kvWriteMs": 0.8,
+    "readbackMs": 0.0,
+    "otherMs": 0.17,
+    "chunkMs": [
+     7.38,
+     6.62,
+     6.64,
+     5.06
+    ]
+   },
+   {
+    "tier": "balance",
+    "function": "step_1",
+    "calls": 1472,
+    "totalMs": 44.26,
+    "inputMs": 0.12,
+    "neuralEngineMs": 42.8,
+    "kvWriteMs": 0.18,
+    "readbackMs": 0.97,
+    "otherMs": 0.2,
+    "chunkMs": [
+     6.74,
+     5.57,
+     5.59,
+     5.6,
+     5.25,
+     5.26,
+     5.25,
+     3.52
+    ]
+   }
+  ],
+  "sources": "phone-perf-full-20261008-01 and phone-perf-balanced-20261008-02 (private run folders, October 2026)"
+ },
+ "callSplitBefore": {
+  "note": "the same medians from the earlier runs of the 1.1 engine, before the host's input arrays were copied in one run: NDArray(scalars:) built every input one value at a time; the host's part of a 128-token call was 34 ms at 4,096 and 129 ms at 32,000 with about 21 ms of dispatch, and of a 16-wide Full call 9 ms with 3 ms of dispatch",
+  "rows": [
+   {
+    "tier": "full",
+    "function": "prefill_16",
+    "calls": 512,
+    "totalMs": 52.35,
+    "inputMs": 9.37,
+    "neuralEngineMs": 39.32,
+    "kvWriteMs": 0.81,
+    "readbackMs": 0.0,
+    "otherMs": 2.85,
+    "chunkMs": [
+     10.72,
+     10.99,
+     10.98,
+     6.63
+    ]
+   },
+   {
+    "tier": "full",
+    "function": "step_1",
+    "calls": 1472,
+    "totalMs": 61.15,
+    "inputMs": 0.72,
+    "neuralEngineMs": 58.76,
+    "kvWriteMs": 0.17,
+    "readbackMs": 0.97,
+    "otherMs": 0.53,
+    "chunkMs": [
+     9.0,
+     7.87,
+     7.87,
+     7.86,
+     7.46,
+     7.45,
+     7.45,
+     3.78
+    ]
+   },
+   {
+    "tier": "balance",
+    "function": "prefill_16",
+    "calls": 512,
+    "totalMs": 38.18,
+    "inputMs": 4.14,
+    "neuralEngineMs": 30.44,
+    "kvWriteMs": 0.8,
+    "readbackMs": 0.0,
+    "otherMs": 2.8,
+    "chunkMs": [
+     7.83,
+     8.04,
+     8.04,
+     6.52
+    ]
+   },
+   {
+    "tier": "balance",
+    "function": "step_1",
+    "calls": 1472,
+    "totalMs": 47.09,
+    "inputMs": 0.39,
+    "neuralEngineMs": 45.03,
+    "kvWriteMs": 0.17,
+    "readbackMs": 0.97,
+    "otherMs": 0.53,
+    "chunkMs": [
+     6.98,
+     5.87,
+     5.89,
+     5.89,
+     5.54,
+     5.53,
+     5.52,
+     3.77
+    ]
+   },
+   {
+    "tier": "liteLong",
+    "function": "prefill_128",
+    "calls": 64,
+    "totalMs": 285.7,
+    "inputMs": 128.92,
+    "neuralEngineMs": 129.81,
+    "kvWriteMs": 6.41,
+    "readbackMs": 0.0,
+    "otherMs": 20.56,
+    "chunkMs": [
+     39.49,
+     38.17,
+     38.19,
+     12.98
+    ]
+   },
+   {
+    "tier": "liteLong",
+    "function": "step_1",
+    "calls": 1472,
+    "totalMs": 76.25,
+    "inputMs": 1.14,
+    "neuralEngineMs": 73.44,
+    "kvWriteMs": 0.18,
+    "readbackMs": 0.97,
+    "otherMs": 0.52,
+    "chunkMs": [
+     11.34,
+     10.13,
+     10.19,
+     10.16,
+     9.79,
+     9.75,
+     9.75,
+     2.34
+    ]
+   },
+   {
+    "tier": "liteFast",
+    "function": "prefill_128",
+    "calls": 64,
+    "totalMs": 124.23,
+    "inputMs": 34.0,
+    "neuralEngineMs": 62.42,
+    "kvWriteMs": 6.24,
+    "readbackMs": 0.0,
+    "otherMs": 21.57,
+    "chunkMs": [
+     16.51,
+     16.45,
+     16.55,
+     12.94
+    ]
+   },
+   {
+    "tier": "liteFast",
+    "function": "step_1",
+    "calls": 1472,
+    "totalMs": 36.43,
+    "inputMs": 0.39,
+    "neuralEngineMs": 34.4,
+    "kvWriteMs": 0.17,
+    "readbackMs": 0.97,
+    "otherMs": 0.5,
+    "chunkMs": [
+     5.61,
+     4.53,
+     4.57,
+     4.56,
+     4.26,
+     4.26,
+     4.26,
+     2.33
+    ]
+   }
+  ]
+ }
+}

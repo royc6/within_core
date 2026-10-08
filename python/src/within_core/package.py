@@ -1,10 +1,15 @@
 """Assemble the downloadable model package and its two manifests.
 
 Pipeline position: the last step, after the chunk export (:mod:`within_core.export`) and the
-FP16 tables (:mod:`within_core.tables`). The package folder holds the chunk assets,
-``chunk-contract.json``, ``gemma-runtime.json``, both tables, the checkpoint's tokenizer and
-generation configuration (unchanged), and the Gemma license and notice. Large files are
-hard-linked where the file system allows it.
+tables (:mod:`within_core.tables`, or :mod:`within_core.qat` for a lite package). The
+package folder holds the chunk assets, ``chunk-contract.json``, ``gemma-runtime.json``, both
+tables, the checkpoint's tokenizer and generation configuration (unchanged), and the Gemma
+license and notice. Large files are hard-linked where the file system allows it. A lite
+package's ``gemma-runtime.json`` is written here as schema 2, with the 2-bit tables'
+descriptors in place of the FP16 ones.
+
+The app bundles either one package's manifest or, since release 1.1, a catalog of one
+package per tier (:func:`catalog`).
 
 The app installs a package only if the ``installed-manifest.json`` inside it equals the
 catalog bundled with the app (``ModelCatalog.json``) and every listed file has the listed
@@ -21,8 +26,12 @@ from pathlib import Path
 
 from within_core.checkpoint import LocalCheckpoint
 from within_core.export import CHUNK_CONTRACT, RUNTIME_CONFIG
+from within_core.qat import TABLES_RECORD, QATCheckpoint
 
 SCHEMA_VERSION = 1
+CATALOG_VERSION = 2
+LITE_RUNTIME_SCHEMA = 2
+TIERS = ("full", "balance", "liteLong", "liteFast")
 MODEL_ID = "gemma-4-e4b"
 BACKEND = "coreAIANE"
 LICENSE_URL = "https://ai.google.dev/gemma/docs/gemma_4_license"
@@ -190,7 +199,7 @@ def link_or_copy(source: Path, destination: Path) -> None:
 def assemble(
     export: Path,
     tables: Path,
-    checkpoint: LocalCheckpoint,
+    checkpoint: LocalCheckpoint | QATCheckpoint,
     output: Path,
     revision: str,
     base_url: str,
@@ -199,7 +208,7 @@ def assemble(
 
     Args:
         export: Finalized export folder (chunk assets, contract, runtime configuration).
-        tables: Folder with the FP16 tables.
+        tables: Folder with the FP16 tables, or the 2-bit tables and their ``tables.json``.
         checkpoint: The verified checkpoint (tokenizer and generation configuration).
         output: New folder for ``package/`` and ``ModelCatalog.json``.
         revision: Package revision, e.g. the Hugging Face tag it is published under.
@@ -220,11 +229,20 @@ def assemble(
     package.mkdir(parents=True)
     for entry in contract["chunks"]:
         link_or_copy(export / entry["file"], package / entry["file"])
-    for name in (CHUNK_CONTRACT, RUNTIME_CONFIG):
-        link_or_copy(export / name, package / name)
-    for key in ("embeddings", "perLayerEmbeddings"):
-        name = runtime[key]["file"]
-        link_or_copy(tables / name, package / name)
+    link_or_copy(export / CHUNK_CONTRACT, package / CHUNK_CONTRACT)
+    record = tables / TABLES_RECORD
+    if record.is_file():
+        descriptors = json.loads(record.read_text())
+        runtime.update(schemaVersion=LITE_RUNTIME_SCHEMA, **descriptors)
+        (package / RUNTIME_CONFIG).write_text(json.dumps(runtime, indent=2) + "\n")
+        for descriptor in descriptors.values():
+            for name in (descriptor["file"], descriptor["scales"]["file"]):
+                link_or_copy(tables / name, package / name)
+    else:
+        link_or_copy(export / RUNTIME_CONFIG, package / RUNTIME_CONFIG)
+        for key in ("embeddings", "perLayerEmbeddings"):
+            name = runtime[key]["file"]
+            link_or_copy(tables / name, package / name)
     link_or_copy(checkpoint.path(GENERATION_CONFIG), package / GENERATION_CONFIG)
     (package / TOKENIZER).mkdir()
     for name in TOKENIZER_FILES:
@@ -236,4 +254,44 @@ def assemble(
     text = json.dumps(data, indent=2, sort_keys=True) + "\n"
     (package / INSTALLED_MANIFEST).write_text(text)
     (output / CATALOG).write_text(text)
+    return data
+
+
+def catalog(entries: list[tuple[str, Path]], default_tier: str, output: Path | None = None) -> dict:
+    """Return a ``catalogVersion`` 2 ``ModelCatalog.json`` listing one package per tier.
+
+    The app reads this catalog since release 1.1: each entry is a package's own
+    ``installed-manifest.json`` under its tier, and the default tier is the one a fresh
+    installation downloads. The rules mirror the app's: one to four packages, distinct tiers
+    and installation IDs, the default among them, and one size per SHA-256 across packages.
+
+    Args:
+        entries: ``(tier, package folder)`` pairs; tiers are :data:`TIERS`.
+        default_tier: The tier a fresh installation downloads.
+        output: Where to write the catalog, if anywhere.
+
+    Raises:
+        PackageError: Naming the first rule that fails.
+    """
+    require(1 <= len(entries) <= 4, "a catalog holds 1 to 4 packages")
+    rows = []
+    for tier, package in entries:
+        require(tier in TIERS, f"unknown tier: {tier}")
+        installed = json.loads((Path(package) / INSTALLED_MANIFEST).read_text())
+        rows.append({"tier": tier, "manifest": validate(installed)})
+    require(len({row["tier"] for row in rows}) == len(rows), "tiers repeat")
+    ids = {f"{row['manifest']['modelID']}-{row['manifest']['revision']}" for row in rows}
+    require(len(ids) == len(rows), "installation IDs repeat")
+    require(any(row["tier"] == default_tier for row in rows), "defaultTier is not in the catalog")
+    sizes: dict[str, int] = {}
+    for row in rows:
+        for file in row["manifest"]["files"]:
+            require(
+                sizes.setdefault(file["sha256"], file["size"]) == file["size"],
+                f"one SHA-256 with two sizes: {file['path']}",
+            )
+    data = {"catalogVersion": CATALOG_VERSION, "defaultTier": default_tier, "packages": rows}
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
     return data
